@@ -406,10 +406,10 @@
   }
 
   let msgTimer;
-  function flash(text, cls){
+  function flash(text, ms){
     msgEl.textContent = text; msgEl.className = "msg";
     clearTimeout(msgTimer);
-    msgTimer = setTimeout(()=> msgEl.classList.add("hidden"), 1400);
+    msgTimer = setTimeout(()=> msgEl.classList.add("hidden"), ms || 1400);
   }
 
   function press(m, fromMic){
@@ -608,6 +608,7 @@
         micSrc.connect(micGain); micGain.connect(micAnalyser);
         el("micWrap").classList.add("on");
         el("micMeterWrap").hidden = false;
+        micStart = 0; micMaxRms = 0; micWarned = false;
         flash("Listening — the meter shows what the mic hears");
         micLoop();
       }catch(err){
@@ -654,6 +655,7 @@
     return sr/(T+shift);
   }
   let micFrame=0, micCandidate=null, micStable=0, lastHitTime=0, lastHeardFlash=0;
+  let micStart=0, micMaxRms=0, micWarned=false;
   function micLoop(){
     micRAF=requestAnimationFrame(micLoop);
     if(!micAnalyser) return;
@@ -662,6 +664,14 @@
     let rms=0; for(let i=0;i<micBuf.length;i++) rms+=micBuf[i]*micBuf[i];
     rms=Math.sqrt(rms/micBuf.length);
     micBarEl.style.width = Math.min(100, Math.round(rms*700)) + "%";
+    // watchdog: some in-app browsers grant the mic but deliver pure silence —
+    // detect that and say so, instead of appearing to ignore the player
+    if(!micStart) micStart = performance.now();
+    if(rms > micMaxRms) micMaxRms = rms;
+    if(!micWarned && performance.now()-micStart > 4000 && micMaxRms < 0.0005){
+      micWarned = true;
+      flash("This browser gives me a silent mic — use MIDI or tapping here, or the mic in Safari", 8000);
+    }
     const f=autoCorrelate(micBuf, micAC.sampleRate);
     if(f<0) { micHeardEl.textContent="—"; micCandidate=null; micStable=0; return; }
     const m=Math.round(69+12*Math.log2(f/440));
@@ -724,7 +734,13 @@
         for(const inp of access.inputs.values()){
           inp.onmidimessage = e => {
             const [st, note, vel] = e.data;
-            if((st & 0xf0) === 0x90 && vel > 0) midiNote(note);
+            if((st & 0xf0) === 0x90 && vel > 0){
+              // badge doubles as an activity monitor: shows the last note heard,
+              // so "is MIDI working?" is answerable at a glance
+              el("midiStatus").hidden = false;
+              el("midiDevName").textContent = midiName(note);
+              midiNote(note);
+            }
           };
         }
         midiShowDevices(access);
