@@ -195,8 +195,10 @@
 
   // ---------- music helpers ----------
   const NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const NAMES_FLAT = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
   const BLACK = new Set([1,3,6,8,10]);
-  const midiName = m => NAMES[m%12] + (Math.floor(m/12)-1);
+  let useFlats = false;   // flat-key songs (see song.flats) spell Bb, not A#, to match the sheet
+  const midiName = m => (useFlats?NAMES_FLAT:NAMES)[m%12] + (Math.floor(m/12)-1);
   const midiFreq = m => 440 * Math.pow(2, (m-69)/12);
 
   // ---------- songs (right-hand melodies, public domain) ----------
@@ -231,6 +233,55 @@
     scale: { name:"C Major scale (warm-up)", tempo:96, notes:[
       [60,1],[62,1],[64,1],[65,1],[67,1],[69,1],[71,1],[72,2],
       [72,1],[71,1],[69,1],[67,1],[65,1],[64,1],[62,1],[60,2]
+    ]},
+    // Petzold, Minuet in G minor BWV Anh. 115 (Anna Magdalena Bach Notebook).
+    // Right hand, complete, both halves; notes verified against the Mutopia
+    // Project engraving (public domain), matching the user's printed edition.
+    minuetgm: { name:"Minuet in G minor (Bach notebook)", tempo:100, flats:true, notes:[
+      [82,1],[81,1],[79,1],
+      [81,1],[74,1],[74,1],
+      [79,1],[67,.5],[69,.5],[70,.5],[72,.5],
+      [74,3],
+      [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
+      [74,1],[75,.5],[74,.5],[72,.5],[70,.5],
+      [72,1],[74,.5],[72,.5],[70,.5],[72,.5],
+      [69,3],
+      [82,1],[81,1],[79,1],
+      [81,1],[74,1],[74,1],
+      [79,1],[67,.5],[69,.5],[70,.5],[72,.5],
+      [74,3],
+      [77,1],[79,.5],[77,.5],[75,.5],[74,.5],
+      [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
+      [74,1],[79,1],[72,1],
+      [70,3],
+      [74,1],[70,.5],[72,.5],[74,.5],[76,.5],
+      [77,1],[79,1],[81,1],
+      [82,1],[79,.5],[81,.5],[82,.5],[79,.5],
+      [81,1],[79,.5],[81,.5],[77,1],
+      [65,.5],[67,.5],[69,.5],[70,.5],[72,.5],[74,.5],
+      [75,1],[74,1],[72,1],
+      [77,1],[70,1],[69,1],
+      [70,3],
+      [67,1],[74,.5],[72,.5],[74,1],
+      [67,1],[75,.5],[74,.5],[75,1],
+      [67,.5],[74,.5],[66,.5],[72,.5],[67,.5],[70,.5],
+      [69,3],
+      [62,.5],[64,.5],[66,.5],[67,.5],[69,.5],[70,.5],
+      [72,1],[70,1],[69,1],
+      [70,.5],[72,.25],[74,.25],[67,1],[66,1],
+      [67,3]
+    ]},
+    // Pachelbel, Canon in D — the famous violin theme (public domain),
+    // first two phrases in quarter notes.
+    canon: { name:"Canon in D (Pachelbel)", tempo:80, notes:[
+      [78,1],[76,1],[74,1],[73,1],
+      [71,1],[69,1],[71,1],[73,1],
+      [74,1],[73,1],[71,1],[69,1],
+      [67,1],[66,1],[67,1],[64,1],
+      [74,1],[78,1],[81,1],[79,1],
+      [78,1],[74,1],[78,1],[76,1],
+      [74,1],[71,1],[74,1],[69,1],
+      [67,1],[71,1],[69,1],[67,1]
     ]}
   };
 
@@ -509,7 +560,7 @@
   });
 
   // ---------- controls ----------
-  function loadSong(key){ stopDemo(); song = SONGS[key]; idx=0; pos=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); refresh(); }
+  function loadSong(key){ stopDemo(); song = SONGS[key]; useFlats = !!song.flats; idx=0; pos=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); refresh(); }
   sel.addEventListener("change", () => loadSong(sel.value));
   el("restart").addEventListener("click", () => { stopDemo(); idx=0; pos=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
 
