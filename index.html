@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keys &middot; learn piano</title>
 <style>
   :root{
@@ -140,6 +142,48 @@
     .wk.bad,.bk.bad{animation:none}
   }
   a.footnote{position:absolute;bottom:6px;right:12px;font-size:11px;color:var(--ink-mute);opacity:.6}
+
+  /* ---- Spotify play-along panel ---- */
+  .spot-panel{
+    position:absolute;inset:0;z-index:5;
+    background:linear-gradient(180deg, var(--stage-2), #14111a);
+    border-radius:var(--r);
+    display:flex;flex-direction:column;gap:14px;
+    padding:18px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
+  .spot-panel[hidden]{display:none}
+  .spot-head{display:flex;align-items:center;gap:10px}
+  .spot-head h2{
+    margin:0;font-family:Georgia,"Iowan Old Style",serif;font-weight:600;
+    font-size:19px;letter-spacing:.3px;
+  }
+  .spot-head .close{margin-left:auto}
+  .spot-note{font-size:13px;color:var(--ink-mute);line-height:1.5;max-width:60ch}
+  .spot-note b{color:var(--ink)}
+  .spot-note ol{margin:8px 0 0;padding-left:20px}
+  .spot-note li{margin:4px 0}
+  .spot-note a{color:var(--brass-bright)}
+  .spot-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .spot-row input[type=text]{
+    flex:1;min-width:200px;font:inherit;font-size:13px;color:var(--ink);
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;
+    padding:9px 12px;user-select:text;-webkit-user-select:text;
+  }
+  .spot-row input[type=text]:focus{outline:none;border-color:var(--brass)}
+  .spot-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;
+  }
+  .spot-card{
+    text-align:left;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
+    padding:12px 13px;transition:border-color .15s;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .spot-card:hover{border-color:var(--brass)}
+  .spot-card .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .spot-card .c{font-size:12px;color:var(--ink-mute)}
+  .spot-embed{border:0;border-radius:12px;width:100%;height:352px;flex-shrink:0}
+  .spot-err{color:var(--bad);font-size:13px}
 </style>
 
 <div class="app">
@@ -155,6 +199,7 @@
       <button class="ctl" id="restart">&#8635; Restart</button>
       <label class="toggle on" id="labelsWrap"><input type="checkbox" id="labels" checked>Note names</label>
       <label class="toggle" id="micWrap"><input type="checkbox" id="mic">Use my real piano &#127908;</label>
+      <button class="ctl" id="spotifyBtn">&#9835; Play along</button>
     </div>
   </header>
 
@@ -168,6 +213,13 @@
   <div class="lane-wrap">
     <canvas id="lane"></canvas>
     <div class="lane-hint" id="hint">Pick a song and start tapping the glowing key &mdash; it waits for you before moving on.</div>
+    <div class="spot-panel" id="spotPanel" hidden>
+      <div class="spot-head">
+        <h2>Play along with your music</h2>
+        <button class="ctl close" id="spotClose">&#10005; Close</button>
+      </div>
+      <div id="spotBody"></div>
+    </div>
   </div>
 
   <div class="kb-wrap">
@@ -539,6 +591,129 @@
       if(m===song.notes[idx][0]){ press(m,true); }
     }
   }
+
+  // ---------- Spotify play-along ----------
+  // Streams your own Spotify via their embedded player while you practice.
+  // Note data never comes from Spotify (it doesn't exist in their API) — this is for playing along by ear.
+  const spPanel = el("spotPanel"), spBody = el("spotBody");
+  const SP = {
+    get cid(){ return localStorage.getItem("sp_cid") || ""; },
+    set cid(v){ localStorage.setItem("sp_cid", v); },
+    get token(){ return sessionStorage.getItem("sp_token") || ""; },
+    redirect(){ return location.origin + location.pathname.replace(/index\.html$/, ""); }
+  };
+  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+
+  el("spotifyBtn").addEventListener("click", () => { spPanel.hidden = false; spRender(); });
+  el("spotClose").addEventListener("click", () => { spPanel.hidden = true; });
+
+  function h(tag, attrs, ...kids){
+    const n = document.createElement(tag);
+    for(const k in (attrs||{})){ if(k==="onclick") n.addEventListener("click", attrs[k]); else n.setAttribute(k, attrs[k]); }
+    kids.forEach(k => n.append(k));
+    return n;
+  }
+
+  function spEmbed(type, id){
+    spBody.replaceChildren(
+      h("div",{class:"spot-row",style:"margin-bottom:10px"},
+        h("button",{class:"ctl", onclick:spRender},"← Back"),
+        h("span",{class:"spot-note"},"Tap play, then switch to Free play and jam along.")),
+      h("iframe",{class:"spot-embed", src:"https://open.spotify.com/embed/"+type+"/"+id,
+        allow:"autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture", loading:"lazy"})
+    );
+  }
+
+  function spPasteRow(){
+    const inp = h("input",{type:"text", placeholder:"...or paste any Spotify song/playlist link here"});
+    const go = () => {
+      const m = inp.value.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|playlist|album|artist|episode)\/([A-Za-z0-9]+)/);
+      if(m) spEmbed(m[1], m[2]);
+      else spBody.prepend(h("div",{class:"spot-err"},"That doesn't look like a Spotify link — copy one with the Share button in Spotify."));
+    };
+    return h("div",{class:"spot-row"}, inp, h("button",{class:"ctl", onclick:go},"Open"));
+  }
+
+  async function spLogin(){
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+    sessionStorage.setItem("sp_verifier", verifier);
+    const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    const p = new URLSearchParams({
+      client_id: SP.cid, response_type:"code", redirect_uri: SP.redirect(),
+      scope:"playlist-read-private playlist-read-collaborative",
+      code_challenge_method:"S256", code_challenge: challenge
+    });
+    location.href = "https://accounts.spotify.com/authorize?" + p;
+  }
+
+  async function spHandleRedirect(){
+    const code = new URLSearchParams(location.search).get("code");
+    if(!code) return;
+    history.replaceState(null, "", location.pathname);
+    try{
+      const r = await fetch("https://accounts.spotify.com/api/token", {
+        method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body: new URLSearchParams({
+          client_id: SP.cid, grant_type:"authorization_code", code,
+          redirect_uri: SP.redirect(), code_verifier: sessionStorage.getItem("sp_verifier")
+        })
+      });
+      const j = await r.json();
+      if(j.access_token){ sessionStorage.setItem("sp_token", j.access_token); spPanel.hidden=false; }
+    }catch(e){ /* shown as logged-out state */ }
+    spRender();
+  }
+
+  async function spRender(){
+    if(!SP.cid){
+      const inp = h("input",{type:"text", placeholder:"Paste your Spotify Client ID"});
+      spBody.replaceChildren(
+        h("div",{class:"spot-note"},
+          h("b",{},"One-time setup (about 2 minutes): "),
+          "Spotify asks every app to register — even personal ones. ",
+          h("ol",{},
+            h("li",{},"Open developer.spotify.com/dashboard and log in with your Spotify account"),
+            h("li",{},"Create app — name it Keys, and set the Redirect URI to exactly: "+SP.redirect()),
+            h("li",{},"Check “Web API”, save, then copy the Client ID and paste it below"))),
+        h("div",{class:"spot-row"}, inp,
+          h("button",{class:"ctl", onclick:()=>{ if(inp.value.trim()){ SP.cid = inp.value.trim(); spRender(); } }},"Save")),
+        h("div",{class:"spot-note"},"No login yet? You can still paste a Spotify link:"),
+        spPasteRow()
+      );
+      return;
+    }
+    if(!SP.token){
+      spBody.replaceChildren(
+        h("div",{class:"spot-row"},
+          h("button",{class:"ctl", onclick:spLogin},"Connect my Spotify →"),
+          h("button",{class:"ctl", onclick:()=>{ localStorage.removeItem("sp_cid"); spRender(); }},"Change Client ID")),
+        h("div",{class:"spot-note"},"Or skip the login and paste a link:"),
+        spPasteRow()
+      );
+      return;
+    }
+    spBody.replaceChildren(h("div",{class:"spot-note"},"Loading your playlists…"));
+    try{
+      const r = await fetch("https://api.spotify.com/v1/me/playlists?limit=50",
+        {headers:{Authorization:"Bearer "+SP.token}});
+      if(r.status===401){ sessionStorage.removeItem("sp_token"); spRender(); return; }
+      const j = await r.json();
+      const cards = (j.items||[]).map(pl =>
+        h("button",{class:"spot-card", onclick:()=>spEmbed("playlist", pl.id)},
+          h("span",{class:"n"}, pl.name),
+          h("span",{class:"c"}, (pl.tracks?.total ?? "?")+" songs")));
+      spBody.replaceChildren(
+        spPasteRow(),
+        h("div",{class:"spot-note",style:"margin:6px 0 2px"},"Your playlists — tap one to play:"),
+        cards.length ? h("div",{class:"spot-grid"}, ...cards)
+                     : h("div",{class:"spot-note"},"No playlists found on this account.")
+      );
+    }catch(e){
+      spBody.replaceChildren(h("div",{class:"spot-err"},"Couldn't reach Spotify — check the connection and try again."),
+        h("div",{class:"spot-row"}, h("button",{class:"ctl", onclick:spRender},"Retry")));
+    }
+  }
+  spHandleRedirect();
 
   // init
   refresh();
