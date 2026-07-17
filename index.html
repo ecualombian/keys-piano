@@ -83,6 +83,10 @@
   .status .k{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
   .status .msg{margin-left:auto;color:var(--brass-bright);font-weight:500;transition:opacity .2s}
   .status .msg.hidden{opacity:0}
+  .micmeter{display:flex;align-items:center;gap:7px}
+  .micmeter .bar{width:72px;height:9px;background:var(--panel);border:1px solid var(--panel-line);border-radius:5px;overflow:hidden}
+  .micmeter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--brass-bright));transition:width .08s}
+  .micmeter .hz{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;min-width:30px}
 
   /* ---- falling lane ---- */
   .lane-wrap{
@@ -162,6 +166,7 @@
     <div>Next: <span class="k" id="nextNote">&mdash;</span></div>
     <div>Progress: <span class="k" id="progress">0 / 0</span></div>
     <div>Accuracy: <span class="k" id="accuracy">100%</span></div>
+    <div class="micmeter" id="micMeterWrap" hidden>&#127908; <div class="bar"><i id="micBar"></i></div> <span class="hz" id="micHeard">&mdash;</span></div>
     <div class="msg hidden" id="msg"></div>
   </div>
 
@@ -481,19 +486,26 @@
   });
 
   // ---------- microphone pitch detection ----------
-  let micStream=null, micAnalyser=null, micBuf=null, micRAF=null;
+  let micStream=null, micAC=null, micSrc=null, micAnalyser=null, micBuf=null, micRAF=null;
   const micChk = el("mic");
+  const micBarEl = el("micBar"), micHeardEl = el("micHeard");
   micChk.addEventListener("change", async () => {
     if(micChk.checked){
       try{
         micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-        const c=ac(); if(c.state==="suspended") await c.resume();
-        const src=c.createMediaStreamSource(micStream);
-        micAnalyser=c.createAnalyser(); micAnalyser.fftSize=2048;
-        micBuf=new Float32Array(micAnalyser.fftSize);
-        src.connect(micAnalyser);
+        // Dedicated context, created AFTER the stream exists, so Safari matches the
+        // mic's real sample rate — a mismatched context captures pure silence on iOS.
+        micAC = new (window.AudioContext||window.webkitAudioContext)();
+        if(micAC.state==="suspended") await micAC.resume();
+        // micSrc kept in a long-lived variable: Safari garbage-collects an
+        // unreferenced source node, which also captures as silence.
+        micSrc = micAC.createMediaStreamSource(micStream);
+        micAnalyser = micAC.createAnalyser(); micAnalyser.fftSize=2048;
+        micBuf = new Float32Array(micAnalyser.fftSize);
+        micSrc.connect(micAnalyser);
         el("micWrap").classList.add("on");
-        flash("Listening — play the glowing note on your piano");
+        el("micMeterWrap").hidden = false;
+        flash("Listening — the meter shows what the mic hears");
         micLoop();
       }catch(err){
         micChk.checked=false;
@@ -502,7 +514,10 @@
     } else {
       if(micRAF) cancelAnimationFrame(micRAF);
       if(micStream) micStream.getTracks().forEach(t=>t.stop());
-      micStream=null; micAnalyser=null; el("micWrap").classList.remove("on");
+      if(micAC) micAC.close();
+      micStream=null; micAC=null; micSrc=null; micAnalyser=null;
+      el("micWrap").classList.remove("on");
+      el("micMeterWrap").hidden = true;
     }
   });
 
@@ -541,9 +556,13 @@
     if(!micAnalyser) return;
     if(++micFrame % 2) return;                    // analyze every other frame — plenty, and half the CPU
     micAnalyser.getFloatTimeDomainData(micBuf);
-    const f=autoCorrelate(micBuf, ac().sampleRate);
-    if(f<0) { micCandidate=null; micStable=0; return; }
+    let rms=0; for(let i=0;i<micBuf.length;i++) rms+=micBuf[i]*micBuf[i];
+    rms=Math.sqrt(rms/micBuf.length);
+    micBarEl.style.width = Math.min(100, Math.round(rms*700)) + "%";
+    const f=autoCorrelate(micBuf, micAC.sampleRate);
+    if(f<0) { micHeardEl.textContent="—"; micCandidate=null; micStable=0; return; }
     const m=Math.round(69+12*Math.log2(f/440));
+    micHeardEl.textContent = midiName(m);
     // stability: the hammer strike is noisy for the first instant, so require
     // the same note on two consecutive reads before believing it
     if(m===micCandidate) micStable++; else { micCandidate=m; micStable=1; return; }
