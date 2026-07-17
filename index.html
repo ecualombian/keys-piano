@@ -87,6 +87,7 @@
   .micmeter .bar{width:72px;height:9px;background:var(--panel);border:1px solid var(--panel-line);border-radius:5px;overflow:hidden}
   .micmeter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--brass-bright));transition:width .08s}
   .micmeter .hz{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;min-width:30px}
+  .micmeter input[type=range]{width:76px;accent-color:var(--brass);cursor:pointer}
 
   /* ---- falling lane ---- */
   .lane-wrap{
@@ -170,7 +171,8 @@
     <div>Next: <span class="k" id="nextNote">&mdash;</span></div>
     <div>Progress: <span class="k" id="progress">0 / 0</span></div>
     <div>Accuracy: <span class="k" id="accuracy">100%</span></div>
-    <div class="micmeter" id="micMeterWrap" hidden>&#127908; <div class="bar"><i id="micBar"></i></div> <span class="hz" id="micHeard">&mdash;</span></div>
+    <div class="micmeter" id="micMeterWrap" hidden>&#127908; <div class="bar"><i id="micBar"></i></div> <span class="hz" id="micHeard">&mdash;</span>
+      <input type="range" id="micGainCtl" min="1" max="12" step="0.5" title="Mic sensitivity"></div>
     <div class="msg hidden" id="msg"></div>
   </div>
 
@@ -526,9 +528,13 @@
   });
 
   // ---------- microphone pitch detection ----------
-  let micStream=null, micAC=null, micSrc=null, micAnalyser=null, micBuf=null, micRAF=null;
+  let micStream=null, micAC=null, micSrc=null, micGain=null, micAnalyser=null, micBuf=null, micRAF=null;
   const micChk = el("mic");
-  const micBarEl = el("micBar"), micHeardEl = el("micHeard");
+  const micBarEl = el("micBar"), micHeardEl = el("micHeard"), micGainCtl = el("micGainCtl");
+  micGainCtl.addEventListener("input", () => {
+    if(micGain) micGain.gain.value = +micGainCtl.value;
+    localStorage.setItem("mic_gain", micGainCtl.value);
+  });
   micChk.addEventListener("change", async () => {
     if(micChk.checked){
       try{
@@ -540,9 +546,12 @@
         // micSrc kept in a long-lived variable: Safari garbage-collects an
         // unreferenced source node, which also captures as silence.
         micSrc = micAC.createMediaStreamSource(micStream);
+        micGain = micAC.createGain();
+        micGain.gain.value = +localStorage.getItem("mic_gain") || 4;
+        micGainCtl.value = micGain.gain.value;
         micAnalyser = micAC.createAnalyser(); micAnalyser.fftSize=2048;
         micBuf = new Float32Array(micAnalyser.fftSize);
-        micSrc.connect(micAnalyser);
+        micSrc.connect(micGain); micGain.connect(micAnalyser);
         el("micWrap").classList.add("on");
         el("micMeterWrap").hidden = false;
         flash("Listening — the meter shows what the mic hears");
@@ -555,7 +564,7 @@
       if(micRAF) cancelAnimationFrame(micRAF);
       if(micStream) micStream.getTracks().forEach(t=>t.stop());
       if(micAC) micAC.close();
-      micStream=null; micAC=null; micSrc=null; micAnalyser=null;
+      micStream=null; micAC=null; micSrc=null; micGain=null; micAnalyser=null;
       el("micWrap").classList.remove("on");
       el("micMeterWrap").hidden = true;
     }
@@ -565,7 +574,7 @@
     const n = buf.length;
     let rms=0; for(let i=0;i<n;i++) rms+=buf[i]*buf[i];
     rms=Math.sqrt(rms/n);
-    if(rms<0.005) return -1;                      // too quiet
+    if(rms<0.002) return -1;                      // too quiet
     // normalized autocorrelation over the piano's practical range (~65 Hz .. 1200 Hz)
     const minLag = Math.floor(sr/1200), maxLag = Math.min(Math.floor(sr/65), n-1);
     const c = new Float32Array(maxLag+1);
