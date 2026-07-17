@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keys &middot; learn piano</title>
 <style>
   :root{
@@ -171,6 +173,7 @@
     <div>Next: <span class="k" id="nextNote">&mdash;</span></div>
     <div>Progress: <span class="k" id="progress">0 / 0</span></div>
     <div>Accuracy: <span class="k" id="accuracy">100%</span></div>
+    <div id="midiStatus" hidden>&#127929; <span class="k" id="midiDevName"></span></div>
     <div class="micmeter" id="micMeterWrap" hidden>&#127908; <div class="bar"><i id="micBar"></i></div> <span class="hz" id="micHeard">&mdash;</span>
       <input type="range" id="micGainCtl" min="1" max="12" step="0.5" title="Mic sensitivity"></div>
     <div class="msg hidden" id="msg"></div>
@@ -629,8 +632,59 @@
     }
   }
 
+  // ---------- MIDI input (Roland FP-10 etc.) ----------
+  // Exact note data from the instrument — no mic guessing. Works where the Web MIDI
+  // API exists (desktop Chrome; on iPad via the "Web MIDI Browser" app — Safari lacks it).
+  // The piano makes its own sound, so MIDI presses never trigger the synth.
+  function midiNote(note){
+    if(mode==="free"){
+      const k = keyEls[note];
+      if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"),150); }
+      return;
+    }
+    const cur = song.notes[idx];
+    if(!cur) return;
+    if(note === cur[0]){              // exact octave required — MIDI data is true
+      hits++;
+      const k = keyEls[note];
+      if(k){ k.classList.remove("target"); k.classList.add("good"); setTimeout(()=>k.classList.remove("good"),180); }
+      idx++;
+      if(idx>=song.notes.length) flash("Beautiful — whole song done! ⭐");
+      refresh();
+    } else {
+      misses++;
+      const k = keyEls[note];
+      if(k){ k.classList.add("bad"); setTimeout(()=>k.classList.remove("bad"),300); }
+      flash("That was "+midiName(note)+" — the target is "+midiName(cur[0]));
+      refresh();
+    }
+  }
+
+  function midiShowDevices(access){
+    const names = [...access.inputs.values()].filter(i=>i.state==="connected").map(i=>i.name);
+    const box = el("midiStatus");
+    if(names.length){ el("midiDevName").textContent = names.join(", "); box.hidden = false; }
+    else box.hidden = true;
+  }
+
+  if(navigator.requestMIDIAccess){
+    navigator.requestMIDIAccess({sysex:false}).then(access => {
+      const bind = () => {
+        for(const inp of access.inputs.values()){
+          inp.onmidimessage = e => {
+            const [st, note, vel] = e.data;
+            if((st & 0xf0) === 0x90 && vel > 0) midiNote(note);
+          };
+        }
+        midiShowDevices(access);
+      };
+      access.onstatechange = bind;
+      bind();
+    }).catch(()=>{ /* permission denied — mic and touch still work */ });
+  }
+
   // debug hook: lets the pitch detector be tested with synthetic tones from the console
-  window.__keysDebug = { autoCorrelate, midiName, sampleRate: () => ac().sampleRate };
+  window.__keysDebug = { autoCorrelate, midiName, midiNote, sampleRate: () => ac().sampleRate };
 
   // init
   buildKeyboard(...windowForSong(song));
