@@ -32,8 +32,12 @@ Claude will file them).
 - [ ] **Fingering data** for Minuet (from the printed sheet + Carlos's pencil marks)
 
 ## Next
-- [ ] Canon in D, book-exact, both hands — waiting on photo of the missing page
-      (keep current simplified theme until then)
+- [x] Canon in D, both hands — SHIPPED 2026-07-17: ground bass + theme + repeated
+      quarters + eighth-note runs + final D, built from public-domain sources
+      (Mutopia violin line + Pachelbel's ostinato), structured to follow the book's
+      sections. NOT a note-for-note copy of the Hal Leonard arrangement (that
+      arrangement is copyrighted); Carlos to flag any spots that diverge from the
+      book while practicing and we adjust from the PD material.
 - [ ] Musette transcription from photo batch
 - [ ] KEXP live radio button with now-playing
 - [ ] Merge the parked `spotify` branch (play-along panel — built, unmerged)
