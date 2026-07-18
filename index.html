@@ -134,6 +134,9 @@
   .wk.target{background:linear-gradient(180deg,#fce3bb,#f4c07e);border-color:#d59a4f}
   .bk.target{background:linear-gradient(180deg,#c98c3f,#8a5c1e)}
   .wk.target .lbl,.bk.target .lbl{opacity:1;color:#5a3d0e}
+  .wk.targetL{background:linear-gradient(180deg,#ddcdf2,#b89ae2);border-color:#9678c2}
+  .bk.targetL{background:linear-gradient(180deg,#8d6cc0,#5d4487)}
+  .wk.targetL .lbl,.bk.targetL .lbl{opacity:1;color:#2e1d4d}
   .wk.good,.bk.good{background:linear-gradient(180deg,#8fe4b0,#4bbd7c)!important}
   .wk.middlec::after{
     content:"";position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
@@ -270,6 +273,41 @@
       [72,1],[70,1],[69,1],
       [70,.5],[72,.25],[74,.25],[67,1],[66,1],
       [67,3]
+    ],
+    // left hand (bass), same source; [null,b] = rest, [m,0] = chord with next note
+    lh: [
+      [55,3],
+      [53,3],
+      [51,3],
+      [50,1],[62,.5],[60,.5],[58,.5],[57,.5],
+      [55,0],[58,2],[57,1],
+      [58,2],[55,1],
+      [57,1],[54,1],[55,1],
+      [50,1],[62,.5],[60,.5],[58,.5],[57,.5],
+      [55,3],
+      [53,3],
+      [51,3],
+      [50,1],[62,.5],[60,.5],[59,.5],[57,.5],
+      [62,0],[59,2],[55,1],
+      [60,1],[57,1],[53,1],
+      [58,1],[51,1],[53,0],[57,1],
+      [58,1],[46,2],
+      [58,3],
+      [57,1],[55,1],[53,1],
+      [55,1],[52,1],[48,1],
+      [53,2],[null,1],
+      [57,1],[55,1],[53,1],
+      [55,1],[53,1],[51,1],
+      [50,1],[51,1],[53,1],
+      [46,1],[62,1],[60,1],
+      [62,0],[59,3],
+      [60,3],
+      [58,1],[57,1],[55,1],
+      [62,1],[57,.5],[55,.5],[54,.5],[52,.5],
+      [50,2],[null,1],
+      [51,1],[50,1],[48,1],
+      [46,1],[48,1],[50,1],
+      [55,1],[43,2]
     ]},
     // Pachelbel, Canon in D — the famous violin theme (public domain),
     // first two phrases in quarter notes.
@@ -351,12 +389,12 @@
     if(kb.offsetWidth !== lastAlignedW){ lastAlignedW = kb.offsetWidth; layoutBlackKeys(); }
   }, 500);
 
-  // Pick the 2-octave (3 for wide songs) C-to-C window centered on the melody,
+  // Pick a C-to-C window sized to the song (both hands included), centered on it,
   // so middle C lands near the middle of the screen instead of the far edge.
   function windowForSong(s){
-    const ns = s.notes.map(n=>n[0]);
+    const ns = s.notes.map(n=>n[0]).concat((s.lh||[]).map(n=>n[0])).filter(m=>m!=null);
     const min = Math.min(...ns), max = Math.max(...ns);
-    const size = (max-min) <= 24 ? 24 : 36;
+    const size = Math.max(24, 12*Math.ceil((max-min+2)/12));
     let lo = 12*Math.round(((min+max)/2 - size/2)/12);
     while(lo+size < max) lo += 12;
     while(lo > min) lo -= 12;
@@ -366,10 +404,34 @@
   // ---------- state ----------
   let mode = "learn";
   let song = SONGS.ode;
-  let idx = 0;             // current target index
-  let pos = 0;             // animated scroll position
+  let steps = [];          // timeline: [{t, notes:[{m, hand, b, done}]}] sorted by t
+  let idx = 0;             // current step index
+  let curT = 0;            // animated playhead position, in beats
   let hits = 0, misses = 0;
-  let awaiting = true;
+
+  // Merge right hand (song.notes) and left hand (song.lh) into one timeline.
+  // Entries are [midi, beats]; midi null = rest; a [m,0] entry starts a chord
+  // with the following note (zero beats advance no time).
+  function buildSteps(s){
+    const ev = [];
+    const walk = (arr, hand) => {
+      let t = 0;
+      for(const [m,b] of (arr||[])){ if(m!=null) ev.push({t, m, hand, b}); t += b; }
+    };
+    walk(s.notes, 0); walk(s.lh, 1);
+    const byT = new Map();
+    for(const e of ev){
+      const k = Math.round(e.t*96);
+      if(!byT.has(k)) byT.set(k, {t:e.t, notes:[]});
+      byT.get(k).notes.push({m:e.m, hand:e.hand, b:e.b, done:false});
+    }
+    const list = [...byT.values()].sort((a,b)=>a.t-b.t);
+    for(const st of list){                       // chord members written [m,0] sound
+      const dur = Math.max(...st.notes.map(n=>n.b));   // for as long as the chord lasts
+      for(const n of st.notes) if(!n.b) n.b = dur;
+    }
+    return list;
+  }
 
   const el = id => document.getElementById(id);
   const nextNoteEl = el("nextNote"), progEl = el("progress"), accEl = el("accuracy"), msgEl = el("msg"), hintEl = el("hint");
@@ -382,20 +444,22 @@
   sel.value = "ode";
 
   function clearKeyClasses(){
-    for(const m in keyEls) keyEls[m].classList.remove("target","good","bad");
+    for(const m in keyEls) keyEls[m].classList.remove("target","targetL","good","bad");
   }
   function refresh(){
     clearKeyClasses();
     if(mode==="learn"){
       hintEl.style.display = "none";
-      const cur = song.notes[idx];
-      if(cur){
-        keyEls[cur[0]].classList.add("target");
-        nextNoteEl.textContent = midiName(cur[0]);
+      const step = steps[idx];
+      if(step){
+        for(const n of step.notes){
+          if(!n.done && keyEls[n.m]) keyEls[n.m].classList.add(n.hand ? "targetL" : "target");
+        }
+        nextNoteEl.textContent = step.notes.filter(n=>!n.done).map(n=>midiName(n.m)).join(" + ") || "…";
       } else {
         nextNoteEl.textContent = "✓ done!";
       }
-      progEl.textContent = idx + " / " + song.notes.length;
+      progEl.textContent = idx + " / " + steps.length;
       const tot = hits+misses;
       accEl.textContent = (tot? Math.round(hits/tot*100):100) + "%";
     } else {
@@ -412,29 +476,33 @@
     msgTimer = setTimeout(()=> msgEl.classList.add("hidden"), ms || 1400);
   }
 
-  function press(m, fromMic){
-    if(!keyEls[m]) return;
-    playNote(m);
+  function press(m, fromMic, silent){
+    if(!silent) playNote(m);           // MIDI and mic stay silent: the real piano already sounded
     if(mode==="free"){
-      keyEls[m].classList.add("down");
-      setTimeout(()=>keyEls[m].classList.remove("down"),140);
+      const k = keyEls[m];
+      if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"),140); }
       return;
     }
-    const cur = song.notes[idx];
-    if(!cur) return;
-    if(m === cur[0]){
-      hits++;
-      const k = keyEls[m]; k.classList.remove("target"); k.classList.add("good");
-      setTimeout(()=>k.classList.remove("good"),180);
-      idx++;
-      if(idx>=song.notes.length){ flash("Beautiful — whole song done! ⭐"); }
+    const step = steps[idx];
+    if(!step) return;
+    // match any not-yet-played note of the current step (mic: octave-forgiving)
+    const cand = step.notes.find(n => !n.done && (fromMic ? n.m%12===m%12 : n.m===m));
+    if(cand){
+      cand.done = true; hits++;
+      const k = keyEls[cand.m];
+      if(k){ k.classList.remove("target","targetL"); k.classList.add("good"); setTimeout(()=>k.classList.remove("good"),180); }
+      if(step.notes.every(n=>n.done)){
+        idx++;
+        if(idx>=steps.length) flash("Beautiful — whole song done! ⭐");
+      }
       refresh();
     } else {
       misses++;
       if(!fromMic){ // don't punish mic overtones as hard
-        const k = keyEls[m]; k.classList.add("bad"); setTimeout(()=>k.classList.remove("bad"),300);
+        const k = keyEls[m];
+        if(k){ k.classList.add("bad"); setTimeout(()=>k.classList.remove("bad"),300); }
       }
-      const want = midiName(cur[0]);
+      const want = step.notes.filter(n=>!n.done).map(n=>midiName(n.m)).join(" + ");
       flash("That was "+midiName(m)+" — try "+want);
       refresh();
     }
@@ -487,7 +555,6 @@
   }
 
   const HITLINE = () => H - 26;
-  const SLOT = 62; // px between notes
 
   let lastKbW = 0;
   function draw(){
@@ -495,45 +562,54 @@
     // resize) — polled here because ResizeObserver isn't reliable in every browser
     if(kb.offsetWidth !== lastKbW){ lastKbW = kb.offsetWidth; layoutBlackKeys(); }
     ctx.clearRect(0,0,W,H);
-    if(mode==="learn" && song.notes.length){
-      // ease pos toward idx
-      pos += (idx - pos) * 0.18;
+    if(mode==="learn" && steps.length){
+      // ease the playhead toward the current step's time — spacing is now
+      // proportional to real musical time, so rhythm is visible in the gaps
+      const targetT = steps[idx] ? steps[idx].t : steps[steps.length-1].t + 2;
+      curT += (targetT - curT) * 0.18;
       const hl = HITLINE();
+      const PPB = 55; // pixels per beat
       // hit line
       ctx.strokeStyle = "rgba(224,164,88,.55)"; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(0,hl); ctx.lineTo(W,hl); ctx.stroke();
       ctx.fillStyle="rgba(224,164,88,.10)"; ctx.fillRect(0,hl,W,H-hl);
 
-      for(let i=0;i<song.notes.length;i++){
-        const y = hl - (i - pos)*SLOT;
-        if(y < -40 || y > hl+30) continue;
-        const [m] = song.notes[i];
-        const kx = keyX(m); if(!kx) continue;
-        const isNext = (i===idx);
-        const done = (i<idx);
-        const w = Math.max(kx.w*0.7, 20), x = kx.x - w/2, h=42;
-        const top = y - h;
-        ctx.beginPath();
-        const rr=8;
-        ctx.moveTo(x+rr,top); ctx.arcTo(x+w,top,x+w,top+h,rr);
-        ctx.arcTo(x+w,top+h,x,top+h,rr); ctx.arcTo(x,top+h,x,top,rr);
-        ctx.arcTo(x,top,x+w,top,rr); ctx.closePath();
-        if(done){ ctx.fillStyle="rgba(99,207,146,.28)"; }
-        else if(isNext){
-          const g = ctx.createLinearGradient(0,top,0,top+h);
-          g.addColorStop(0,"#f4c07e"); g.addColorStop(1,"#e0a458");
-          ctx.fillStyle=g; ctx.shadowColor="rgba(244,192,126,.6)"; ctx.shadowBlur=18;
-        } else {
-          const g = ctx.createLinearGradient(0,top,0,top+h);
-          g.addColorStop(0,"#6fb6c9"); g.addColorStop(1,"#3a5c66");
-          ctx.fillStyle=g;
+      for(let i=0;i<steps.length;i++){
+        const st = steps[i];
+        const yb = hl - (st.t - curT)*PPB;   // bottom edge = the note's start moment
+        if(yb < -10) break;                  // everything after is further above the view
+        for(const n of st.notes){
+          const h = Math.max(24, n.b*PPB - 6);   // block length shows the note's duration
+          if(yb - h > H) continue;
+          const kx = keyX(n.m); if(!kx) continue;
+          const isNext = (i===idx);
+          const done = (i<idx) || n.done;
+          const w = Math.max(kx.w*0.7, 20), x = kx.x - w/2;
+          const top = yb - h;
+          ctx.beginPath();
+          const rr=7;
+          ctx.moveTo(x+rr,top); ctx.arcTo(x+w,top,x+w,top+h,rr);
+          ctx.arcTo(x+w,top+h,x,top+h,rr); ctx.arcTo(x,top+h,x,top,rr);
+          ctx.arcTo(x,top,x+w,top,rr); ctx.closePath();
+          if(done){ ctx.fillStyle="rgba(99,207,146,.28)"; }
+          else if(isNext){
+            const g = ctx.createLinearGradient(0,top,0,top+h);
+            if(n.hand){ g.addColorStop(0,"#d9c5f7"); g.addColorStop(1,"#a184d1"); ctx.shadowColor="rgba(178,148,228,.6)"; }
+            else { g.addColorStop(0,"#f4c07e"); g.addColorStop(1,"#e0a458"); ctx.shadowColor="rgba(244,192,126,.6)"; }
+            ctx.fillStyle=g; ctx.shadowBlur=18;
+          } else {
+            const g = ctx.createLinearGradient(0,top,0,top+h);
+            if(n.hand){ g.addColorStop(0,"#9d7fd0"); g.addColorStop(1,"#4d3a70"); }
+            else { g.addColorStop(0,"#6fb6c9"); g.addColorStop(1,"#3a5c66"); }
+            ctx.fillStyle=g;
+          }
+          ctx.fill(); ctx.shadowBlur=0;
+          // note label sits at the start edge of the block
+          ctx.fillStyle = isNext? (n.hand? "#2e1d4d" : "#4a2f08") : "rgba(240,240,240,.85)";
+          ctx.font = "600 12px -apple-system,system-ui,sans-serif";
+          ctx.textAlign="center"; ctx.textBaseline="middle";
+          ctx.fillText(midiName(n.m), kx.x, yb-12);
         }
-        ctx.fill(); ctx.shadowBlur=0;
-        // note label
-        ctx.fillStyle = isNext? "#4a2f08" : "rgba(240,240,240,.85)";
-        ctx.font = "600 12px -apple-system,system-ui,sans-serif";
-        ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.fillText(midiName(m), kx.x, top+h/2);
       }
     }
     requestAnimationFrame(draw);
@@ -548,21 +624,25 @@
     if(ac().state==="suspended") ac().resume();
     el("listen").innerHTML="&#9632; Stop";
     let i=0; const beat = 60/song.tempo;
-    const step = () => {
-      if(i>=song.notes.length){ stopDemo(); return; }
-      const [m,b] = song.notes[i];
-      playNote(m, Math.max(beat*b*0.9,0.25));
-      const k=keyEls[m]; k.classList.add("down"); setTimeout(()=>k.classList.remove("down"), beat*b*1000*0.8);
+    const playStep = () => {
+      if(i>=steps.length){ stopDemo(); return; }
+      const st = steps[i];
+      for(const n of st.notes){
+        playNote(n.m, Math.max(beat*n.b*0.9,0.25), n.hand?0.32:0.5);   // LH a touch softer
+        const k=keyEls[n.m];
+        if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"), beat*n.b*1000*0.8); }
+      }
       i++;
-      demoTimer = setTimeout(step, beat*b*1000);
+      const delay = (i<steps.length ? steps[i].t - st.t : (st.notes[0]?.b || 1)) * beat * 1000;
+      demoTimer = setTimeout(playStep, delay);
     };
-    step();
+    playStep();
   });
 
   // ---------- controls ----------
-  function loadSong(key){ stopDemo(); song = SONGS[key]; useFlats = !!song.flats; idx=0; pos=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); refresh(); }
+  function loadSong(key){ stopDemo(); song = SONGS[key]; useFlats = !!song.flats; steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); refresh(); }
   sel.addEventListener("change", () => loadSong(sel.value));
-  el("restart").addEventListener("click", () => { stopDemo(); idx=0; pos=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
+  el("restart").addEventListener("click", () => { stopDemo(); steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
 
   el("mode-learn").addEventListener("click", () => setMode("learn"));
   el("mode-free").addEventListener("click", () => setMode("free"));
@@ -570,7 +650,7 @@
     mode=m; stopDemo();
     el("mode-learn").setAttribute("aria-pressed", m==="learn");
     el("mode-free").setAttribute("aria-pressed", m==="free");
-    if(m==="learn"){ idx=0; pos=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); }
+    if(m==="learn"){ steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); }
     else buildKeyboard(48, 72);   // free play: C3..C5, middle C centered
     refresh();
   }
@@ -681,15 +761,15 @@
     if(m===micCandidate) micStable++; else { micCandidate=m; micStable=1; return; }
     if(micStable!==2) return;                     // fire once per stable note, not continuously
     const now=performance.now();
-    if(mode!=="learn" || !song.notes[idx]) return;
-    const target = song.notes[idx][0];
-    if(m%12 === target%12){                       // octave-forgiving: iPad mics often hear the octave harmonic
+    if(mode!=="learn" || !steps[idx]) return;
+    const open = steps[idx].notes.filter(n=>!n.done);
+    if(open.some(n => n.m%12 === m%12)){          // octave-forgiving: iPad mics often hear the octave harmonic
       if(now-lastHitTime < 600) return;           // let the previous note's ring fade before re-triggering
       lastHitTime = now;
-      press(target, true);                        // light up the actual target key
+      press(m, true, true);                       // matching + key lighting happen in press
     } else if(now-lastHeardFlash > 1200){
       lastHeardFlash = now;
-      flash("Heard "+midiName(m)+" — the target is "+midiName(target));
+      flash("Heard "+midiName(m)+" — the target is "+open.map(n=>midiName(n.m)).join(" + "));
     }
   }
 
@@ -697,29 +777,10 @@
   // Exact note data from the instrument — no mic guessing. Works where the Web MIDI
   // API exists (desktop Chrome; on iPad via the "Web MIDI Browser" app — Safari lacks it).
   // The piano makes its own sound, so MIDI presses never trigger the synth.
-  function midiNote(note){
-    if(mode==="free"){
-      const k = keyEls[note];
-      if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"),150); }
-      return;
-    }
-    const cur = song.notes[idx];
-    if(!cur) return;
-    if(note === cur[0]){              // exact octave required — MIDI data is true
-      hits++;
-      const k = keyEls[note];
-      if(k){ k.classList.remove("target"); k.classList.add("good"); setTimeout(()=>k.classList.remove("good"),180); }
-      idx++;
-      if(idx>=song.notes.length) flash("Beautiful — whole song done! ⭐");
-      refresh();
-    } else {
-      misses++;
-      const k = keyEls[note];
-      if(k){ k.classList.add("bad"); setTimeout(()=>k.classList.remove("bad"),300); }
-      flash("That was "+midiName(note)+" — the target is "+midiName(cur[0]));
-      refresh();
-    }
-  }
+  // MIDI notes go through the same step engine as taps; exact octave required
+  // (MIDI data is true), silent (the real piano already sounded). Chords work:
+  // each key's note-on arrives separately and fills in its slot of the step.
+  function midiNote(note){ press(note, false, true); }
 
   function midiShowDevices(access){
     const names = [...access.inputs.values()].filter(i=>i.state==="connected").map(i=>i.name);
@@ -754,6 +815,7 @@
   window.__keysDebug = { autoCorrelate, midiName, midiNote, sampleRate: () => ac().sampleRate };
 
   // init
+  steps = buildSteps(song);
   buildKeyboard(...windowForSong(song));
   refresh();
 })();
