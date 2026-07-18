@@ -6,10 +6,14 @@ freely (it's just text — edit, commit, push, or paste thoughts into chat and
 Claude will file them).
 
 ## Now (next working session)
-- [ ] **Hand selector [L | Both | R]** — practice each hand separately before putting
-      them together (teacher-standard). Second axis, independent of levels; works at
-      every level. v1: other hand hidden. Fast follows: ghosted (other hand faint,
-      not required) and **duet mode** (app plays the other hand while you play yours).
+- [x] **Hand selector [L | Both | R]** — SHIPPED 2026-07-17. v1: other hand hidden;
+      Listen respects the selection (hear each hand alone). Fast follows still open:
+      ghosted other hand, **duet mode** (app plays the other hand while you play yours).
+- [x] **Ornament tolerance in the gate** — SHIPPED 2026-07-17 (verified: flourish over
+      held LH note is neutral, real mistakes still count).
+- [x] **Listen plays ornaments** — SHIPPED 2026-07-17 (real main–neighbor–main flourish).
+- [x] **Mordent visuals** — SHIPPED 2026-07-17 (zigzag glyph above block, satellite
+      chip on neighbor key's lane; lower mordents get the vertical stroke).
 - [ ] **Difficulty levels per song** — one transcription, three views:
   - L1 "The Tune": melody-first, core signs only, no repeats/ornaments
   - L2 "The Hands": exact both hands + finger numbers shown atop falling bars
