@@ -17,6 +17,14 @@ Claude will file them).
   - Note: the hand selector absorbs part of L1's job (levels × hands mix freely)
 - [ ] **Listen plays ornaments** at every level (mordents/trills as real fast notes —
       the fun part of the piece should be audible)
+- [ ] **Ornament tolerance in the gate** — neighbor notes of an ornamented target are
+      never counted wrong (before the main note or in a short grace window after), so
+      actually performing a mordent — even over a held LH chord — is rewarded, not
+      punished. Gate stays press-triggered (release-gating breaks legato feel; decided
+      2026-07-17, Carlos's scenario, Claude's trigger analysis).
+- [ ] **Mordent visuals**: real zigzag glyph on the block (not "~" text), plus small
+      satellite chips on the neighbor key's lane at L3 showing the back-and-forth
+      motion spatially.
 - [ ] **Fingering data** for Minuet (from the printed sheet + Carlos's pencil marks)
 
 ## Next
@@ -30,6 +38,9 @@ Claude will file them).
 - [ ] More songs from Alfred's (public-domain pieces only)
 - [ ] Metronome + slow-practice tempo control
 - [ ] Section looping (practice just measures 13–16, repeat)
+- [ ] Use MIDI note-off (release) data — currently discarded. Not as the step trigger
+      (press stays the trigger; release-gating breaks legato), but for: held-duration
+      honesty on long notes, sustain visualization, held-chord detection for duet mode.
 - [ ] Native iPad app (CoreMIDI, App Store) — needs Xcode + Apple Developer decisions
 
 ## Decisions on record
