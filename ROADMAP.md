@@ -1,0 +1,46 @@
+# Keys — Roadmap
+
+The idea parking lot. Anything worth doing gets written here first; work happens in
+batches pulled from **Now**. Claude keeps this file updated; Carlos adds/reorders
+freely (it's just text — edit, commit, push, or paste thoughts into chat and
+Claude will file them).
+
+## Now (next working session)
+- [ ] **Difficulty levels per song** — one transcription, three views:
+  - L1 "The Tune": melody-first, core signs only, no repeats/ornaments
+  - L2 "The Hands": exact both hands + finger numbers shown atop falling bars
+  - L3 "As Written": repeats + ornaments marked, exact octaves (today's Minuet)
+- [ ] **Listen plays ornaments** at every level (mordents/trills as real fast notes —
+      the fun part of the piece should be audible)
+- [ ] **Fingering data** for Minuet (from the printed sheet + Carlos's pencil marks)
+
+## Next
+- [ ] Canon in D, book-exact, both hands — waiting on photo of the missing page
+      (keep current simplified theme until then)
+- [ ] Musette transcription from photo batch
+- [ ] KEXP live radio button with now-playing
+- [ ] Merge the parked `spotify` branch (play-along panel — built, unmerged)
+
+## Later / ideas
+- [ ] More songs from Alfred's (public-domain pieces only)
+- [ ] Metronome + slow-practice tempo control
+- [ ] Section looping (practice just measures 13–16, repeat)
+- [ ] Native iPad app (CoreMIDI, App Store) — needs Xcode + Apple Developer decisions
+- [ ] Left/right hand solo practice toggle (mute one hand's targets)
+
+## Decisions on record
+- Ornaments: shown as `~`, main note satisfies the gate; full ornament playing is
+  L3-and-beyond territory. They always sound in Listen.
+- MIDI = primary input (MIDIWeb Browser on iPad, FP-10 over Bluetooth MIDI);
+  mic = fallback; on-screen touch always works.
+- Song sources: public-domain works only; Carlos's own sheets are the preferred
+  reference for octaves/fingerings.
+- Canon stays as the simplified famous theme until the full book arrangement lands.
+
+## How we collaborate (agreed 2026-07-17)
+1. Carlos practices; friction goes in a note (here, or just told to Claude —
+   even "measure 21 felt wrong" is enough).
+2. Ideas accumulate here instead of interrupting practice.
+3. Working sessions pull a batch from **Now**, ship it, verify on the live site,
+   move checked items to the git history.
+4. `main` = always-working live site; risky work happens on branches.
