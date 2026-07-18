@@ -997,7 +997,13 @@
   const SP = {
     get cid(){ return localStorage.getItem("sp_cid") || ""; },
     set cid(v){ localStorage.setItem("sp_cid", v); },
-    get token(){ return sessionStorage.getItem("sp_token") || ""; },
+    // a token that would be rejected as an HTTP header (half-saved, corrupted)
+    // is treated as absent, so the panel self-heals back to the Connect button
+    get token(){
+      const t = sessionStorage.getItem("sp_token") || "";
+      if(t && !/^[\x21-\x7E]+$/.test(t)){ sessionStorage.removeItem("sp_token"); return ""; }
+      return t;
+    },
     redirect(){ return location.origin + location.pathname.replace(/index\.html$/, ""); }
   };
   const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
@@ -1057,7 +1063,7 @@
         })
       });
       const j = await r.json();
-      if(j.access_token){ sessionStorage.setItem("sp_token", j.access_token); spPanel.hidden=false; }
+      if(j.access_token && /^[\x21-\x7E]+$/.test(j.access_token)){ sessionStorage.setItem("sp_token", j.access_token); spPanel.hidden=false; }
     }catch(e){ /* shown as logged-out state */ }
     spRender();
   }
