@@ -164,6 +164,11 @@
         <button id="mode-learn" aria-pressed="true">Learn a song</button>
         <button id="mode-free" aria-pressed="false">Free play</button>
       </div>
+      <div class="seg" role="group" aria-label="Hands" id="handSeg" hidden>
+        <button id="hand-L" aria-pressed="false">Left</button>
+        <button id="hand-B" aria-pressed="true">Both</button>
+        <button id="hand-R" aria-pressed="false">Right</button>
+      </div>
       <select id="song" aria-label="Choose a song"></select>
       <button class="ctl" id="listen">&#9654; Listen</button>
       <button class="ctl" id="restart">&#8635; Restart</button>
@@ -248,21 +253,21 @@
       [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
       [74,1],[75,.5],[74,.5],[72,.5],[70,.5],
       [72,1],[74,.5],[72,.5],[70,.5],[72,.5],
-      [69,3,"~"],
-      [82,1],[81,1,"~"],[79,1],
+      [69,3,1],
+      [82,1],[81,1,1],[79,1],
       [81,1],[74,1],[74,1],
       [79,1],[67,.5],[69,.5],[70,.5],[72,.5],
       [74,3],
-      [77,1,"~"],[79,.5],[77,.5],[75,.5],[74,.5],
+      [77,1,-2],[79,.5],[77,.5],[75,.5],[74,.5],
       [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
-      [74,1],[79,1],[72,1,"~"],
+      [74,1],[79,1],[72,1,2],
       [70,3],
       [74,1],[70,.5],[72,.5],[74,.5],[76,.5],
       [77,1],[79,1],[81,1],
       [82,1],[79,.5],[81,.5],[82,.5],[79,.5],
       [81,1],[79,.5],[81,.5],[77,1],
       [65,.5],[67,.5],[69,.5],[70,.5],[72,.5],[74,.5],
-      [75,1],[74,1,"~"],[72,1],
+      [75,1],[74,1,-2],[72,1],
       [77,1],[70,1],[69,1],
       [70,3],
       [67,1],[74,.5],[72,.5],[74,1],
@@ -271,7 +276,7 @@
       [69,3],
       [62,.5],[64,.5],[66,.5],[67,.5],[69,.5],[70,.5],
       [72,1],[70,1],[69,1],
-      [70,.5,"~"],[72,.25],[74,.25],[67,1],[66,1],
+      [70,.5,2],[72,.25],[74,.25],[67,1],[66,1],
       [67,3]
     ],
     // left hand (bass), same source; [null,b] = rest, [m,0] = chord with next note
@@ -418,6 +423,7 @@
   // ---------- state ----------
   let mode = "learn";
   let song = SONGS.ode;
+  let handFilter = "B";    // L = left hand only, R = right only, B = both
   let steps = [];          // timeline: [{t, notes:[{m, hand, b, done}]}] sorted by t
   let idx = 0;             // current step index
   let curT = 0;            // animated playhead position, in beats
@@ -432,7 +438,9 @@
       let t = 0;
       for(const [m,b,o] of (arr||[])){ if(m!=null) ev.push({t, m, hand, b, o}); t += b; }
     };
-    walk(s.notes, 0); walk(s.lh, 1);
+    // the hand selector filters at the source: Left = lh only, Right = melody only
+    if(handFilter !== "L") walk(s.notes, 0);
+    if(handFilter !== "R") walk(s.lh, 1);
     const byT = new Map();
     for(const e of ev){
       const k = Math.round(e.t*96);
@@ -506,11 +514,18 @@
       const k = keyEls[cand.m];
       if(k){ k.classList.remove("target","targetL"); k.classList.add("good"); setTimeout(()=>k.classList.remove("good"),180); }
       if(step.notes.every(n=>n.done)){
+        lastDoneStep = step; lastDoneAt = performance.now();
         idx++;
         if(idx>=steps.length) flash("Beautiful — whole song done! ⭐");
       }
       refresh();
     } else {
+      // ornament tolerance: neighbor notes of an ornamented target are never wrong —
+      // performing the mordent/trill (main-neighbor-main, even over a held chord)
+      // must be rewarded, not punished. Applies to the current step and, for a short
+      // grace window, the step just completed (catches the flourish's tail).
+      const nearOrn = st => st && st.notes.some(n => n.o && Math.abs(n.m - m) <= 2);
+      if(nearOrn(step) || (performance.now() - lastDoneAt < 700 && nearOrn(lastDoneStep))) return;
       misses++;
       if(!fromMic){ // don't punish mic overtones as hard
         const k = keyEls[m];
@@ -618,12 +633,37 @@
             ctx.fillStyle=g;
           }
           ctx.fill(); ctx.shadowBlur=0;
-          // note label sits at the start edge of the block; ~ marks an ornament
-          // (trill/mordent on the sheet — play the main note, decorate when ready)
+          // note label sits at the start edge of the block
           ctx.fillStyle = isNext? (n.hand? "#2e1d4d" : "#4a2f08") : "rgba(240,240,240,.85)";
           ctx.font = "600 12px -apple-system,system-ui,sans-serif";
           ctx.textAlign="center"; ctx.textBaseline="middle";
-          ctx.fillText(midiName(n.m) + (n.o ? " ~" : ""), kx.x, yb-12);
+          ctx.fillText(midiName(n.m), kx.x, yb-12);
+          if(n.o && !done){
+            // satellite chip on the neighbor key's own lane at the start edge:
+            // the mordent's "quick back and forth" shown as geography
+            const nk = keyX(n.m + n.o);
+            if(nk){
+              const cw = Math.max(nk.w*0.45, 12), ch = 10;
+              const cx0 = nk.x - cw/2, cy0 = yb - ch - 1;
+              ctx.beginPath();
+              ctx.moveTo(cx0+3,cy0); ctx.arcTo(cx0+cw,cy0,cx0+cw,cy0+ch,3);
+              ctx.arcTo(cx0+cw,cy0+ch,cx0,cy0+ch,3); ctx.arcTo(cx0,cy0+ch,cx0,cy0,3);
+              ctx.arcTo(cx0,cy0,cx0+cw,cy0,3); ctx.closePath();
+              ctx.fillStyle = n.hand? "rgba(157,127,208,.6)" : "rgba(111,182,201,.6)";
+              ctx.fill();
+            }
+            // the actual mordent zigzag, floating above the block like on the sheet;
+            // vertical stroke through it = lower mordent (as in engraving practice)
+            const gx = kx.x, gy = top - 9;
+            ctx.strokeStyle = isNext ? "#f4c07e" : (n.hand? "#b89ae2" : "#8fd0e2");
+            ctx.lineWidth = 1.6; ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(gx-8, gy+3);
+            ctx.lineTo(gx-4, gy-3); ctx.lineTo(gx, gy+3);
+            ctx.lineTo(gx+4, gy-3); ctx.lineTo(gx+8, gy+3);
+            ctx.stroke();
+            if(n.o < 0){ ctx.beginPath(); ctx.moveTo(gx, gy-6); ctx.lineTo(gx, gy+6); ctx.stroke(); }
+          }
         }
       }
     }
@@ -643,7 +683,15 @@
       if(i>=steps.length){ stopDemo(); return; }
       const st = steps[i];
       for(const n of st.notes){
-        playNote(n.m, Math.max(beat*n.b*0.9,0.25), n.hand?0.32:0.5);   // LH a touch softer
+        const vel = n.hand?0.32:0.5;               // LH a touch softer
+        if(n.o){
+          // play the ornament for real: quick main–neighbor–main flourish
+          playNote(n.m, 0.11, vel);
+          setTimeout(()=>playNote(n.m+n.o, 0.11, vel), 95);
+          setTimeout(()=>playNote(n.m, Math.max(beat*n.b*0.9-0.19, 0.2), vel), 190);
+        } else {
+          playNote(n.m, Math.max(beat*n.b*0.9,0.25), vel);
+        }
         const k=keyEls[n.m];
         if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"), beat*n.b*1000*0.8); }
       }
@@ -655,7 +703,14 @@
   });
 
   // ---------- controls ----------
-  function loadSong(key){ stopDemo(); song = SONGS[key]; useFlats = !!song.flats; steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); refresh(); }
+  function loadSong(key){
+    stopDemo(); song = SONGS[key]; useFlats = !!song.flats;
+    if(!song.lh) handFilter = "B";                    // no left hand to isolate
+    for(const x of ["L","B","R"]) el("hand-"+x).setAttribute("aria-pressed", x===handFilter);
+    el("handSeg").hidden = !(song.lh && mode==="learn");
+    steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0;
+    buildKeyboard(...windowForSong(song)); refresh();
+  }
   sel.addEventListener("change", () => loadSong(sel.value));
   el("restart").addEventListener("click", () => { stopDemo(); steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
 
@@ -667,7 +722,16 @@
     el("mode-free").setAttribute("aria-pressed", m==="free");
     if(m==="learn"){ steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); }
     else buildKeyboard(48, 72);   // free play: C3..C5, middle C centered
+    el("handSeg").hidden = !(song.lh && m==="learn");
     refresh();
+  }
+
+  for(const h of ["L","B","R"]) el("hand-"+h).addEventListener("click", () => setHand(h));
+  function setHand(h){
+    handFilter = h;
+    for(const x of ["L","B","R"]) el("hand-"+x).setAttribute("aria-pressed", x===h);
+    stopDemo(); steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; refresh();
+    flash(h==="B" ? "Both hands together" : (h==="L" ? "Left hand alone" : "Right hand alone"));
   }
 
   const labels = el("labels");
@@ -749,6 +813,7 @@
     const shift = denom ? 0.5*(a-d)/denom : 0;
     return sr/(T+shift);
   }
+  let lastDoneStep=null, lastDoneAt=0;
   let micFrame=0, micCandidate=null, micStable=0, lastHitTime=0, lastHeardFlash=0;
   let micStart=0, micMaxRms=0, micWarned=false;
   function micLoop(){
@@ -827,7 +892,12 @@
   }
 
   // debug hook: lets the pitch detector be tested with synthetic tones from the console
-  window.__keysDebug = { autoCorrelate, midiName, midiNote, sampleRate: () => ac().sampleRate };
+  window.__keysDebug = {
+    autoCorrelate, midiName, midiNote,
+    sampleRate: () => ac().sampleRate,
+    state: () => ({stepCount: steps.length, idx, handFilter, step: steps[idx]}),
+    jump: n => { idx = Math.min(n, steps.length); if(steps[idx]) curT = steps[idx].t; refresh(); }
+  };
 
   // init
   steps = buildSteps(song);
