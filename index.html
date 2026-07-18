@@ -1107,8 +1107,14 @@
                      : h("div",{class:"spot-note"},"No playlists found on this account.")
       );
     }catch(e){
-      spBody.replaceChildren(h("div",{class:"spot-err"},"Couldn't reach Spotify — check the connection and try again."),
-        h("div",{class:"spot-row"}, h("button",{class:"ctl", onclick:spRender},"Retry")));
+      spBody.replaceChildren(
+        h("div",{class:"spot-err"},"Couldn't reach Spotify — the playlist request was blocked or failed."),
+        h("div",{class:"spot-note"},"Technical detail: " + ((e && e.message) || e) +
+          ". A VPN or content blocker that filters api.spotify.com causes exactly this — try pausing it for this site."),
+        h("div",{class:"spot-row"}, h("button",{class:"ctl", onclick:spRender},"Retry")),
+        h("div",{class:"spot-note"},"Meanwhile, pasting a Spotify link below still works — that player doesn't use the blocked route:"),
+        spPasteRow()
+      );
     }
   }
   spHandleRedirect();
