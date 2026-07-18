@@ -6,10 +6,15 @@ freely (it's just text — edit, commit, push, or paste thoughts into chat and
 Claude will file them).
 
 ## Now (next working session)
+- [ ] **Hand selector [L | Both | R]** — practice each hand separately before putting
+      them together (teacher-standard). Second axis, independent of levels; works at
+      every level. v1: other hand hidden. Fast follows: ghosted (other hand faint,
+      not required) and **duet mode** (app plays the other hand while you play yours).
 - [ ] **Difficulty levels per song** — one transcription, three views:
   - L1 "The Tune": melody-first, core signs only, no repeats/ornaments
   - L2 "The Hands": exact both hands + finger numbers shown atop falling bars
   - L3 "As Written": repeats + ornaments marked, exact octaves (today's Minuet)
+  - Note: the hand selector absorbs part of L1's job (levels × hands mix freely)
 - [ ] **Listen plays ornaments** at every level (mordents/trills as real fast notes —
       the fun part of the piece should be audible)
 - [ ] **Fingering data** for Minuet (from the printed sheet + Carlos's pencil marks)
@@ -26,7 +31,6 @@ Claude will file them).
 - [ ] Metronome + slow-practice tempo control
 - [ ] Section looping (practice just measures 13–16, repeat)
 - [ ] Native iPad app (CoreMIDI, App Store) — needs Xcode + Apple Developer decisions
-- [ ] Left/right hand solo practice toggle (mute one hand's targets)
 
 ## Decisions on record
 - Ornaments: shown as `~`, main note satisfies the gate; full ornament playing is
