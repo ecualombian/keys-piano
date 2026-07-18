@@ -248,21 +248,21 @@
       [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
       [74,1],[75,.5],[74,.5],[72,.5],[70,.5],
       [72,1],[74,.5],[72,.5],[70,.5],[72,.5],
-      [69,3],
-      [82,1],[81,1],[79,1],
+      [69,3,"~"],
+      [82,1],[81,1,"~"],[79,1],
       [81,1],[74,1],[74,1],
       [79,1],[67,.5],[69,.5],[70,.5],[72,.5],
       [74,3],
-      [77,1],[79,.5],[77,.5],[75,.5],[74,.5],
+      [77,1,"~"],[79,.5],[77,.5],[75,.5],[74,.5],
       [75,1],[77,.5],[75,.5],[74,.5],[72,.5],
-      [74,1],[79,1],[72,1],
+      [74,1],[79,1],[72,1,"~"],
       [70,3],
       [74,1],[70,.5],[72,.5],[74,.5],[76,.5],
       [77,1],[79,1],[81,1],
       [82,1],[79,.5],[81,.5],[82,.5],[79,.5],
       [81,1],[79,.5],[81,.5],[77,1],
       [65,.5],[67,.5],[69,.5],[70,.5],[72,.5],[74,.5],
-      [75,1],[74,1],[72,1],
+      [75,1],[74,1,"~"],[72,1],
       [77,1],[70,1],[69,1],
       [70,3],
       [67,1],[74,.5],[72,.5],[74,1],
@@ -271,7 +271,7 @@
       [69,3],
       [62,.5],[64,.5],[66,.5],[67,.5],[69,.5],[70,.5],
       [72,1],[70,1],[69,1],
-      [70,.5],[72,.25],[74,.25],[67,1],[66,1],
+      [70,.5,"~"],[72,.25],[74,.25],[67,1],[66,1],
       [67,3]
     ],
     // left hand (bass), same source; [null,b] = rest, [m,0] = chord with next note
@@ -322,6 +322,20 @@
       [67,1],[71,1],[69,1],[67,1]
     ]}
   };
+
+  // Honor the Minuet's repeat signs (||: :||): each 16-bar half (48 beats) plays twice.
+  (() => {
+    const s = SONGS.minuetgm;
+    const splitAt = (arr, beats) => {
+      let t = 0, i = 0;
+      for(; i < arr.length && t < beats; i++) t += arr[i][1];
+      return [arr.slice(0, i), arr.slice(i)];
+    };
+    for(const part of ["notes", "lh"]){
+      const [A, B] = splitAt(s[part], 48);
+      s[part] = [...A, ...A, ...B, ...B];
+    }
+  })();
 
   // ---------- audio ----------
   let AC = null;
@@ -416,14 +430,14 @@
     const ev = [];
     const walk = (arr, hand) => {
       let t = 0;
-      for(const [m,b] of (arr||[])){ if(m!=null) ev.push({t, m, hand, b}); t += b; }
+      for(const [m,b,o] of (arr||[])){ if(m!=null) ev.push({t, m, hand, b, o}); t += b; }
     };
     walk(s.notes, 0); walk(s.lh, 1);
     const byT = new Map();
     for(const e of ev){
       const k = Math.round(e.t*96);
       if(!byT.has(k)) byT.set(k, {t:e.t, notes:[]});
-      byT.get(k).notes.push({m:e.m, hand:e.hand, b:e.b, done:false});
+      byT.get(k).notes.push({m:e.m, hand:e.hand, b:e.b, o:e.o, done:false});
     }
     const list = [...byT.values()].sort((a,b)=>a.t-b.t);
     for(const st of list){                       // chord members written [m,0] sound
@@ -604,11 +618,12 @@
             ctx.fillStyle=g;
           }
           ctx.fill(); ctx.shadowBlur=0;
-          // note label sits at the start edge of the block
+          // note label sits at the start edge of the block; ~ marks an ornament
+          // (trill/mordent on the sheet — play the main note, decorate when ready)
           ctx.fillStyle = isNext? (n.hand? "#2e1d4d" : "#4a2f08") : "rgba(240,240,240,.85)";
           ctx.font = "600 12px -apple-system,system-ui,sans-serif";
           ctx.textAlign="center"; ctx.textBaseline="middle";
-          ctx.fillText(midiName(n.m), kx.x, yb-12);
+          ctx.fillText(midiName(n.m) + (n.o ? " ~" : ""), kx.x, yb-12);
         }
       }
     }
