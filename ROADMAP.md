@@ -38,9 +38,12 @@ Claude will file them).
       sections. NOT a note-for-note copy of the Hal Leonard arrangement (that
       arrangement is copyrighted); Carlos to flag any spots that diverge from the
       book while practicing and we adjust from the PD material.
-- [ ] Musette transcription from photo batch
+- [x] Musette part 1 — SHIPPED 2026-07-18 overnight (A section + repeat, both hands,
+      6/8 in F, drone bass). B section (systems 2–3, has accidentals) still to
+      transcribe — needs either a flatter photo of page 90 or a careful second pass.
+- [x] Spotify play-along — MERGED 2026-07-18 overnight. Carlos still to do the
+      one-time setup (developer.spotify.com Client ID) and login test.
 - [ ] KEXP live radio button with now-playing
-- [ ] Merge the parked `spotify` branch (play-along panel — built, unmerged)
 
 ## Later / ideas
 - [ ] More songs from Alfred's (public-domain pieces only)
