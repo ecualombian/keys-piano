@@ -53,8 +53,20 @@ Claude will file them).
       and 3 of the scan are the same music and now agree.
       Lesson: beat-total and gate checks pass happily on wrong pitches. Verifying a
       song means checking the notes against the source, not just that it plays.
-- [x] Spotify play-along — MERGED 2026-07-18 overnight. Carlos still to do the
-      one-time setup (developer.spotify.com Client ID) and login test.
+- [~] Spotify play-along — REMOVED 2026-07-19. Spotify's "Update on Developer Access
+      and Platform Security" (posted 2026-02-06) reduced Development Mode in scope:
+      **Development Mode now requires a Spotify Premium account**, one Client ID per
+      developer, **max 5 authorized users per Client ID**, and a narrowed endpoint
+      list. New Client IDs from 2026-02-11; existing integrations from 2026-03-09
+      (the 03-09 update postponed only the *endpoint* changes — the Premium
+      requirement and user cap took effect as planned).
+      Two independent killers: Carlos isn't buying Premium, and the 5-user cap breaks
+      the baked-in-shared-Client-ID design on a public Pages site the moment a sixth
+      person opens it. Code is in git history if it's ever wanted back.
+      Note for later: the *paste-a-link embed* in that panel needed no Client ID,
+      no login and no developer app — only the "connect my playlists" half did.
+      A free replacement is a paste-a-YouTube-link embed: full-length tracks, no
+      account, no API key. That's the version worth building if play-along returns.
 - [ ] KEXP live radio button with now-playing
 
 ## Later / ideas
@@ -75,6 +87,11 @@ Claude will file them).
   reference for octaves/fingerings.
 - Canon stays as the simplified famous theme until the full book arrangement lands.
 
+## Awaiting Carlos at the keyboard (not done until played)
+- [ ] **Musette** — corrected A section (D minor) shipped 2026-07-19 but NOT yet
+      played by Carlos. Claude's checks prove the app *runs*; only playing it proves
+      the notes are *right*. This is the gate that the first Musette bug slipped past.
+
 ## How we collaborate (agreed 2026-07-17)
 1. Carlos practices; friction goes in a note (here, or just told to Claude —
    even "measure 21 felt wrong" is enough).
@@ -82,3 +99,11 @@ Claude will file them).
 3. Working sessions pull a batch from **Now**, ship it, verify on the live site,
    move checked items to the git history.
 4. `main` = always-working live site; risky work happens on branches.
+5. **Git (agreed 2026-07-19):** song changes commit straight to `main`, one commit
+   per song — GitHub Pages only serves `main`, so a song on a branch can't be
+   practised on the iPad, and a diff of MIDI integers isn't reviewable by eye.
+   Branches/PRs are for engine work, where a bug means the app won't load at all.
+6. **Before a song ships, Claude posts the melody in note names** (plus harmonic
+   sanity checks: does it end on the tonic? do the LH chords match the key?), not a
+   diff. That is the reviewable artifact; `[74,.5]` is not. A whole-piece misreading
+   shows up instantly in note names and is invisible in a diff.
