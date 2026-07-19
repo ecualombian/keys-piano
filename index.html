@@ -261,6 +261,36 @@
 
   // ---------- songs (right-hand melodies, public domain) ----------
   // n = MIDI note, b = beats
+
+  // Musette (Oh ma tendre musette!), anon., 6/8 in F. Form is ||: A :|| ||: B A :||
+  // so A is played four times and B twice; the sections are spelled out once here
+  // and spread into the song below. Beat unit = quarter, so a measure is 3.
+  const MUSETTE_A_RH = [
+    [74,.5],[74,.5],[74,.5],[77,1],[77,.5],   // D D D  F F
+    [81,1],[79,.5],[77,1.5],                  // A  G  F
+    [79,.5],[81,.5],[79,.5],[77,1],[76,.5],   // G A G  F E
+    [74,3]                                    // D  (tonic)
+  ];
+  const MUSETTE_A_LH = [
+    [50,.5],[53,.5],[57,.5],[50,.5],[53,.5],[57,.5],   // D minor
+    [50,.5],[53,.5],[57,.5],[50,.5],[53,.5],[57,.5],   // D minor
+    [50,.5],[55,.5],[58,.5],[50,.5],[55,.5],[57,.5],   // G minor, then A
+    [50,.5],[53,.5],[57,.5],[50,1],[null,.5]           // D minor
+  ];
+  // B section = mm. 5-8, the half that cadences in D minor (the C#s).
+  const MUSETTE_B_RH = [
+    [76,.5],[77,.5],[79,.5],[79,.5],[77,.5],[76,.5],
+    [74,1.5],[73,1.5],
+    [74,.5],[73,.5],[74,.5],[76,1],[77,.5],
+    [77,1.5],[76,1.5]
+  ];
+  const MUSETTE_B_LH = [
+    [57,1],[64,.5],[57,.5],[62,.5],[64,.5],
+    [65,1.5],[64,1.5],
+    [57,0],[65,.5],[57,0],[64,.5],[57,0],[62,.5],[57,0],[61,1],[57,0],[62,.5],
+    [57,0],[62,1.5],[57,0],[61,1],[null,.5]
+  ];
+
   const SONGS = {
     twinkle: { name:"Twinkle, Twinkle", tempo:104, notes:[
       [60,1],[60,1],[67,1],[67,1],[69,1],[69,1],[67,2],
@@ -364,28 +394,24 @@
       [46,1],[48,1],[50,1],
       [55,1],[43,2]
     ]},
-    // Musette "Oh ma tendre musette" (anon., public domain) — from the user's
-    // method book, 6/8 in F. Part 1 (A section, repeated) transcribed from photo;
-    // B section pending a second reading pass.
-    musette: { name:"Musette — part 1 (Oh ma tendre)", tempo:96, flats:true, notes:[
-      [72,.5],[72,.5],[72,.5],[76,1],[74,.5],
-      [79,1],[77,.5],[76,1.5],
-      [77,.5],[79,.5],[77,.5],[76,1],[74,.5],
-      [76,3],
-      [72,.5],[72,.5],[72,.5],[76,1],[74,.5],
-      [79,1],[77,.5],[76,1.5],
-      [77,.5],[79,.5],[77,.5],[76,1],[74,.5],
-      [76,3]
+    // Musette "Oh ma tendre musette" (anon., public domain) — complete, both hands,
+    // transcribed from the user's Suzuki Piano vol. 1 page (sheets/, no. 18, p.31).
+    // Key is D MINOR, not F major: melody starts and ends on D, LH is D minor / G
+    // minor broken chords. An earlier reading of this piece (from a photo of a
+    // different book) had the whole A section a step low over F-A-C; it is fixed
+    // here against the clean scan, cross-checked between systems 1 and 3.
+    // `flats` is on so the diatonic Bb (m3's G minor) spells correctly. Known wart:
+    // that also spells the raised leading tone C# as Db — the app has one flats flag
+    // per song, not per note.
+    musette: { name:"Musette (Oh ma tendre)", tempo:96, flats:true, notes:[
+      ...MUSETTE_A_RH, ...MUSETTE_A_RH,          // ||: A :||
+      ...MUSETTE_B_RH, ...MUSETTE_A_RH,          // ||: B A
+      ...MUSETTE_B_RH, ...MUSETTE_A_RH           //         :||
     ],
     lh: [
-      [53,.5],[57,.5],[60,.5],[53,.5],[57,.5],[60,.5],
-      [53,.5],[57,.5],[60,.5],[53,.5],[57,.5],[60,.5],
-      [52,.5],[55,.5],[60,.5],[52,.5],[55,.5],[60,.5],
-      [52,.5],[55,.5],[60,.5],[48,1],[null,.5],
-      [53,.5],[57,.5],[60,.5],[53,.5],[57,.5],[60,.5],
-      [53,.5],[57,.5],[60,.5],[53,.5],[57,.5],[60,.5],
-      [52,.5],[55,.5],[60,.5],[52,.5],[55,.5],[60,.5],
-      [52,.5],[55,.5],[60,.5],[48,1],[null,.5]
+      ...MUSETTE_A_LH, ...MUSETTE_A_LH,
+      ...MUSETTE_B_LH, ...MUSETTE_A_LH,
+      ...MUSETTE_B_LH, ...MUSETTE_A_LH
     ]},
     // Pachelbel, Canon in D — public domain; violin line per the Mutopia/Paterson
     // engraving (CC-BY), ground bass per Pachelbel's ostinato. Sections: quarter

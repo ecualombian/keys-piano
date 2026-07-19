@@ -38,9 +38,21 @@ Claude will file them).
       sections. NOT a note-for-note copy of the Hal Leonard arrangement (that
       arrangement is copyrighted); Carlos to flag any spots that diverge from the
       book while practicing and we adjust from the PD material.
-- [x] Musette part 1 — SHIPPED 2026-07-18 overnight (A section + repeat, both hands,
-      6/8 in F, drone bass). B section (systems 2–3, has accidentals) still to
-      transcribe — needs either a flatter photo of page 90 or a careful second pass.
+- [x] Musette — COMPLETE 2026-07-18. Carlos supplied a clean PDF of the Suzuki vol. 1
+      page (no. 18, p.31), which unblocked the B section. Whole piece is now in:
+      form ||: A :|| ||: B A :|| (24 measures), both hands, with the D-minor cadence
+      (C#4/C#5) of mm. 5–8. Song no longer marked `flats` — no B-flat occurs in it,
+      so the only accidental now spells as C# instead of Db.
+      The PDF lives in `sheets/`, which is gitignored: the underlying work is public
+      domain but that scan is a copyrighted modern edition and this repo is public.
+- [x] **Musette A section was WRONG — fixed 2026-07-19.** Carlos hit wrong notes while
+      practicing. The piece is in **D minor**, not F major (same one-flat signature).
+      The original A section (read from a photo of a different book) had both hands a
+      step low over F-A-C; melody now reads D D D F F | A G F | G A G F E | D, ending
+      on the tonic, over D minor / G minor broken chords. Verified twice — systems 1
+      and 3 of the scan are the same music and now agree.
+      Lesson: beat-total and gate checks pass happily on wrong pitches. Verifying a
+      song means checking the notes against the source, not just that it plays.
 - [x] Spotify play-along — MERGED 2026-07-18 overnight. Carlos still to do the
       one-time setup (developer.spotify.com Client ID) and login test.
 - [ ] KEXP live radio button with now-playing

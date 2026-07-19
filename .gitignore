@@ -4,3 +4,12 @@
 # editor cruft
 *.swp
 .vscode/
+
+# local dev-server config: holds a session-specific scratchpad path, so it is
+# regenerated per session rather than tracked (see ARCHITECTURE.md).
+.claude/launch.json
+
+# reference scans of purchased sheet music — local only.
+# The underlying works are public domain, but these are copyrighted modern
+# editions and this repo is published as a public GitHub Pages site.
+sheets/
