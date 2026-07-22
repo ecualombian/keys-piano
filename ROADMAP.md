@@ -6,6 +6,19 @@ freely (it's just text — edit, commit, push, or paste thoughts into chat and
 Claude will file them).
 
 ## Now (next working session)
+- [x] **Back / rewind (fine)** — SHIPPED 2026-07-19. "⏪ Back" button + ← key step the
+      playhead back a few notes (3 steps/press) and re-arm them; the lane slides back.
+      Manual only, works for any song, no section data needed. Verified: replays clean
+      to the end, guards at the start, no-ops in free play.
+- [ ] **Back to start of section** — the structural jump Carlos asked for ("flub in
+      m7, drop to the top of the strain at m5"). NEEDS the song format to carry section
+      boundaries, which it does not today — repeats are flattened into one list. Plan:
+      author songs as `sections:{A,B...}` + `form:['A','A','B','A','B','A']`; buildSteps
+      records where each section instance begins; the jump becomes a lookup. Same
+      structure unlocks **section looping** and **difficulty levels** (both below).
+      Open design Qs for Carlos: strain-level jump (whole A/B) vs measure-level?
+      Add drag-the-lane-to-scrub as the free-rewind gesture too, or is the button enough?
+
 - [x] **Hand selector [L | Both | R]** — SHIPPED 2026-07-17. v1: other hand hidden;
       Listen respects the selection (hear each hand alone). Fast follows still open:
       ghosted other hand, **duet mode** (app plays the other hand while you play yours).

@@ -172,6 +172,7 @@
       </div>
       <select id="song" aria-label="Choose a song"></select>
       <button class="ctl" id="listen">&#9654; Listen</button>
+      <button class="ctl" id="back" title="Back up a few notes (← key)">&#9194; Back</button>
       <button class="ctl" id="restart">&#8635; Restart</button>
       <label class="toggle on" id="labelsWrap"><input type="checkbox" id="labels" checked>Note names</label>
       <label class="toggle" id="micWrap"><input type="checkbox" id="mic">Use my real piano &#127908;</label>
@@ -623,6 +624,7 @@
   // computer keyboard shortcuts (home row -> white keys) for desktop testing
   const KEYMAP = {a:60,w:61,s:62,e:63,d:64,f:65,t:66,g:67,y:68,h:69,u:70,j:71,k:72,o:73,l:74};
   window.addEventListener("keydown", e => {
+    if(e.key==="ArrowLeft"){ e.preventDefault(); rewind(REWIND_STEPS); return; }  // hold to scrub back
     if(e.repeat) return;
     const m = KEYMAP[e.key.toLowerCase()];
     if(m!=null){ if(ac().state==="suspended") ac().resume(); press(m,false);
@@ -781,6 +783,21 @@
   }
   sel.addEventListener("change", () => loadSong(sel.value));
   el("restart").addEventListener("click", () => { stopDemo(); steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
+
+  // Back up a few notes to re-approach a spot you flubbed. Manual only — the gate
+  // still waits for you; this just moves the playhead earlier. Works for any song
+  // (no section data needed): it steps idx back and re-arms the notes from there so
+  // they can be played again. curT eases in draw(), so the lane slides back visibly.
+  const REWIND_STEPS = 3;
+  function rewind(n){
+    if(mode!=="learn" || !steps.length) return;
+    if(idx<=0){ flash("Already at the start"); return; }
+    stopDemo();
+    idx = Math.max(0, idx - n);
+    for(let i=idx;i<steps.length;i++) for(const nt of steps[i].notes) nt.done=false;
+    refresh();
+  }
+  el("back").addEventListener("click", () => rewind(REWIND_STEPS));
 
   el("mode-learn").addEventListener("click", () => setMode("learn"));
   el("mode-free").addEventListener("click", () => setMode("free"));
