@@ -529,10 +529,64 @@
 
   // song selector
   const sel = el("song");
-  Object.entries(SONGS).forEach(([k,v]) => {
-    const o = document.createElement("option"); o.value=k; o.textContent=v.name; sel.appendChild(o);
-  });
+
+  // ---------- personal songs (device-local, never in the repo) ----------
+  // Imported songs live only in THIS browser's localStorage, so you can practice
+  // pieces we can't publish (e.g. a copyrighted book arrangement) on the live site
+  // from your own device. Delivery is a one-time "#import=<data>" link (see below).
+  const CUSTOM_KEY = "keys_custom_songs";
+  let customSongs; try{ customSongs = JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}; }catch(e){ customSongs = {}; }
+  const isCustom = k => Object.prototype.hasOwnProperty.call(customSongs, k);
+  Object.assign(SONGS, customSongs);                    // make imported songs loadable
+  let justImported = null;
+
+  function renderSongList(){
+    const keep = sel.value;
+    sel.replaceChildren();
+    for(const [k,v] of Object.entries(SONGS)){
+      if(isCustom(k)) continue;                          // built-ins first
+      const o = document.createElement("option"); o.value=k; o.textContent=v.name; sel.appendChild(o);
+    }
+    const ck = Object.keys(customSongs);
+    if(ck.length){
+      const g = document.createElement("optgroup"); g.label = "My songs (this device)";
+      for(const k of ck){ const o=document.createElement("option"); o.value=k; o.textContent="★ "+customSongs[k].name; g.appendChild(o); }
+      sel.appendChild(g);
+    }
+    if(SONGS[keep]) sel.value = keep;
+  }
+
+  // store an imported song; keyed by name so re-importing a correction overwrites it
+  function saveImported(s){
+    if(!s || typeof s!=="object" || typeof s.name!=="string" || !s.name.trim()) return null;
+    if(!Array.isArray(s.notes) || !s.notes.length || (s.lh && !Array.isArray(s.lh))) return null;
+    const clean = { name:s.name.trim(), tempo:(+s.tempo||100), notes:s.notes };
+    if(s.flats) clean.flats = true;
+    if(s.lh) clean.lh = s.lh;
+    let key = Object.keys(customSongs).find(k => customSongs[k].name===clean.name);
+    if(!key){ const b = "my_"+(clean.name.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,24) || "song");
+      key = b; let i=2; while(SONGS[key]) key = b+(i++); }
+    customSongs[key] = clean; SONGS[key] = clean;
+    try{ localStorage.setItem(CUSTOM_KEY, JSON.stringify(customSongs)); }catch(e){}
+    return key;
+  }
+
+  renderSongList();
   sel.value = "ode";
+
+  // One-time import: open  <site>/#import=<base64url(JSON)>  on the device. The data
+  // rides in the URL fragment, which the browser never sends to any server, so a
+  // personal (unpublished) song reaches the live site without ever entering the repo.
+  (function(){
+    const m = location.hash.match(/^#import=(.+)$/);
+    if(!m) return;
+    try{
+      const json = decodeURIComponent(escape(atob(m[1].replace(/-/g,"+").replace(/_/g,"/"))));
+      const key = saveImported(JSON.parse(json));
+      if(key){ justImported = SONGS[key].name; renderSongList(); sel.value = key; }
+    }catch(e){ /* malformed link → ignore; the app still loads normally */ }
+    history.replaceState(null, "", location.pathname + location.search);
+  })();
 
   function clearKeyClasses(){
     for(const m in keyEls) keyEls[m].classList.remove("target","targetL","good","bad");
@@ -985,9 +1039,8 @@
   };
 
 
-  // init
-  steps = buildSteps(song);
-  buildKeyboard(...windowForSong(song));
-  refresh();
+  // init — load whatever is selected (the imported song, if a #import= link brought us here)
+  loadSong(SONGS[sel.value] ? sel.value : "ode");
+  if(justImported) flash("Added “"+justImported+"” — see My songs ★ in the list", 3600);
 })();
 </script>
