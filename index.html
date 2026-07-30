@@ -264,7 +264,7 @@
       [64,1],[62,1],[60,1],[62,1],[64,1],[64,1],[64,1],[64,1],
       [62,1],[62,1],[64,1],[62,1],[60,4]
     ]},
-    furelise: { name:"Für Elise (opening)", tempo:120, notes:[
+    furelise: { name:"Für Elise (opening)", tempo:120, meter:3, notes:[
       [76,.5],[75,.5],[76,.5],[75,.5],[76,.5],[71,.5],[74,.5],[72,.5],
       [69,1],[60,.5],[64,.5],[69,.5],[71,1],[64,.5],[68,.5],[71,.5],[72,1],
       [64,.5],[76,.5],[75,.5],[76,.5],[75,.5],[76,.5],[71,.5],[74,.5],[72,.5],
@@ -277,7 +277,7 @@
     // Petzold, Minuet in G minor BWV Anh. 115 (Anna Magdalena Bach Notebook).
     // Right hand, complete, both halves; notes verified against the Mutopia
     // Project engraving (public domain), matching the user's printed edition.
-    minuetgm: { name:"Minuet in G minor (Bach notebook)", tempo:100, flats:true, notes:[
+    minuetgm: { name:"Minuet in G minor (Bach notebook)", tempo:100, flats:true, meter:3, notes:[
       [82,1],[81,1],[79,1],
       [81,1],[74,1],[74,1],
       [79,1],[67,.5],[69,.5],[70,.5],[72,.5],
@@ -355,7 +355,7 @@
     // `flats` is on so the diatonic Bb (m3's G minor) spells correctly. Known wart:
     // that also spells the raised leading tone C# as Db — the app has one flats flag
     // per song, not per note.
-    musette: { name:"Musette (Oh ma tendre)", tempo:96, flats:true, notes:[
+    musette: { name:"Musette (Oh ma tendre)", tempo:96, flats:true, meter:3, notes:[
       ...MUSETTE_A_RH, ...MUSETTE_A_RH,          // ||: A :||
       ...MUSETTE_B_RH, ...MUSETTE_A_RH,          // ||: B A
       ...MUSETTE_B_RH, ...MUSETTE_A_RH           //         :||
@@ -562,6 +562,7 @@
     if(!Array.isArray(s.notes) || !s.notes.length || (s.lh && !Array.isArray(s.lh))) return null;
     const clean = { name:s.name.trim(), tempo:(+s.tempo||100), notes:s.notes };
     if(s.flats) clean.flats = true;
+    if(s.meter) clean.meter = +s.meter;
     if(s.lh) clean.lh = s.lh;
     let key = Object.keys(customSongs).find(k => customSongs[k].name===clean.name);
     if(!key){ const b = "my_"+(clean.name.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,24) || "song");
@@ -678,7 +679,7 @@
   // computer keyboard shortcuts (home row -> white keys) for desktop testing
   const KEYMAP = {a:60,w:61,s:62,e:63,d:64,f:65,t:66,g:67,y:68,h:69,u:70,j:71,k:72,o:73,l:74};
   window.addEventListener("keydown", e => {
-    if(e.key==="ArrowLeft"){ e.preventDefault(); rewind(REWIND_STEPS); return; }  // hold to scrub back
+    if(e.key==="ArrowLeft"){ e.preventDefault(); rewind(); return; }  // hold to walk back a measure at a time
     if(e.repeat) return;
     const m = KEYMAP[e.key.toLowerCase()];
     if(m!=null){ if(ac().state==="suspended") ac().resume(); press(m,false);
@@ -842,20 +843,26 @@
   sel.addEventListener("change", () => loadSong(sel.value));
   el("restart").addEventListener("click", () => { stopDemo(); steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; refresh(); flash("Reset — from the top"); });
 
-  // Back up a few notes to re-approach a spot you flubbed. Manual only — the gate
-  // still waits for you; this just moves the playhead earlier. Works for any song
-  // (no section data needed): it steps idx back and re-arms the notes from there so
-  // they can be played again. curT eases in draw(), so the lane slides back visibly.
-  const REWIND_STEPS = 3;
-  function rewind(n){
+  // Back up to re-approach a spot you flubbed. Snaps the playhead to the start of the
+  // current measure; if you're already on a barline it goes to the previous measure,
+  // so repeated presses walk back a measure at a time. Manual only — the gate still
+  // waits for you. Re-arms the notes from there; curT eases in draw() so the lane
+  // slides back visibly. Measure length = song.meter beats (default 4).
+  function rewind(){
     if(mode!=="learn" || !steps.length) return;
     if(idx<=0){ flash("Already at the start"); return; }
     stopDemo();
-    idx = Math.max(0, idx - n);
+    const M = song.meter || 4;
+    const cur = steps[idx].t, measure = Math.floor(cur/M + 1e-4);
+    // mid-measure → this measure's start; on the barline → the previous measure's start
+    const target = Math.max(0, (cur - measure*M < 1e-4 ? measure-1 : measure) * M);
+    let j = 0; while(j < steps.length && steps[j].t < target - 1e-4) j++;
+    idx = j;
     for(let i=idx;i<steps.length;i++) for(const nt of steps[i].notes) nt.done=false;
     refresh();
+    flash("◀ measure " + (Math.round(target/M) + 1));
   }
-  el("back").addEventListener("click", () => rewind(REWIND_STEPS));
+  el("back").addEventListener("click", rewind);
 
   el("mode-learn").addEventListener("click", () => setMode("learn"));
   el("mode-free").addEventListener("click", () => setMode("free"));
