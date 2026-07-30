@@ -32,6 +32,21 @@ Claude will file them).
   - L2 "The Hands": exact both hands + finger numbers shown atop falling bars
   - L3 "As Written": repeats + ornaments marked, exact octaves (today's Minuet)
   - Note: the hand selector absorbs part of L1's job (levels × hands mix freely)
+  - **Guiding model — "local original as the marker" (agreed 2026-07-19):**
+    Every scanned piece yields an **exact original** = the full-fidelity version of
+    Carlos's own book, which is the practice *target* / North Star. Originals live
+    **device-local** (the ★ "My songs" list, delivered via #import= links) regardless
+    of copyright — so a copyrighted book arrangement is handled structurally: it
+    simply never leaves the device, no per-piece copyright call needed. The Canon
+    Carlos imported 2026-07-19 is the first instance.
+    The **published** app holds the Levels ladder, **rebuilt from public-domain
+    sources**, climbing toward that original. Copyright ceiling: for copyrighted
+    pieces the underlying melody is PD, so **L1 "the tune" is publishable**, but an
+    L2/L3 mirroring the book's specific voicing/accompaniment is not — so their
+    published ladder stops where it stops being PD, and the full arrangement exists
+    only as the local original. PD works have no ceiling (L3 = the whole piece, as
+    the Minuet already is). Naming keeps the two distinct: local
+    "Canon in D — book (my practice)" vs a future published "Canon in D — L1 Tune".
 - [ ] **Listen plays ornaments** at every level (mordents/trills as real fast notes —
       the fun part of the piece should be audible)
 - [ ] **Ornament tolerance in the gate** — neighbor notes of an ornamented target are
