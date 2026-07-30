@@ -85,6 +85,12 @@
   .status .k{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
   .status .msg{margin-left:auto;color:var(--brass-bright);font-weight:500;transition:opacity .2s}
   .status .msg.hidden{opacity:0}
+  .secbar{display:flex;align-items:center;gap:8px;padding:2px 4px;font-size:13px;color:var(--ink-mute)}
+  .secbar[hidden]{display:none}
+  .secbar .lbl{letter-spacing:.3px}
+  .secbar .now{color:var(--ink);font-weight:700;min-width:1.4em;text-align:center}
+  .secbar button.ctl{padding:5px 9px}
+  .secbar .steps{margin-left:auto;color:var(--ink-mute);font-size:12px}
   .micmeter{display:flex;align-items:center;gap:7px}
   .micmeter .bar{width:72px;height:9px;background:var(--panel);border:1px solid var(--panel-line);border-radius:5px;overflow:hidden}
   .micmeter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--brass-bright));transition:width .08s}
@@ -187,6 +193,15 @@
     <div class="micmeter" id="micMeterWrap" hidden>&#127908; <div class="bar"><i id="micBar"></i></div> <span class="hz" id="micHeard">&mdash;</span>
       <input type="range" id="micGainCtl" min="1" max="12" step="0.5" title="Mic sensitivity"></div>
     <div class="msg hidden" id="msg"></div>
+  </div>
+
+  <div class="secbar" id="secBar" hidden>
+    <span class="lbl">Section</span>
+    <button class="ctl" id="secPrev" title="Back to the start of this section (press again for the previous one)">&#9664;</button>
+    <b class="now" id="secName">A</b>
+    <button class="ctl" id="secNext" title="Skip to the next section">&#9654;</button>
+    <button class="ctl" id="secPlay">&#9654; Play section</button>
+    <label class="toggle" id="secLoopWrap"><input type="checkbox" id="secLoop">Loop it</label>
   </div>
 
   <div class="lane-wrap">
@@ -355,16 +370,15 @@
     // `flats` is on so the diatonic Bb (m3's G minor) spells correctly. Known wart:
     // that also spells the raised leading tone C# as Db — the app has one flats flag
     // per song, not per note.
-    musette: { name:"Musette (Oh ma tendre)", tempo:96, flats:true, meter:3, notes:[
-      ...MUSETTE_A_RH, ...MUSETTE_A_RH,          // ||: A :||
-      ...MUSETTE_B_RH, ...MUSETTE_A_RH,          // ||: B A
-      ...MUSETTE_B_RH, ...MUSETTE_A_RH           //         :||
-    ],
-    lh: [
-      ...MUSETTE_A_LH, ...MUSETTE_A_LH,
-      ...MUSETTE_B_LH, ...MUSETTE_A_LH,
-      ...MUSETTE_B_LH, ...MUSETTE_A_LH
-    ]},
+    // Sectioned form ||: A :|| ||: B A :|| — the engine expands `form` into the same
+    // A A B A B A timeline as before, but now each strain is labelled and navigable.
+    musette: { name:"Musette (Oh ma tendre)", tempo:96, flats:true, meter:3,
+      sections: {
+        A: { notes: MUSETTE_A_RH, lh: MUSETTE_A_LH },
+        B: { notes: MUSETTE_B_RH, lh: MUSETTE_B_LH }
+      },
+      form: ["A","A","B","A","B","A"]
+    },
     // Pachelbel, Canon in D — public domain; violin line per the Mutopia/Paterson
     // engraving (CC-BY), ground bass per Pachelbel's ostinato. Sections: quarter
     // theme (2 cycles), repeated-note quarters, the eighth-note runs, final D.
@@ -480,7 +494,8 @@
   // Pick a C-to-C window sized to the song (both hands included), centered on it,
   // so middle C lands near the middle of the screen instead of the far edge.
   function windowForSong(s){
-    const ns = s.notes.map(n=>n[0]).concat((s.lh||[]).map(n=>n[0])).filter(m=>m!=null);
+    const { notes, lh } = expandSong(s);              // works for flat and sectioned songs
+    const ns = (notes||[]).map(n=>n[0]).concat((lh||[]).map(n=>n[0])).filter(m=>m!=null);
     const min = Math.min(...ns), max = Math.max(...ns);
     const size = Math.max(24, 12*Math.ceil((max-min+2)/12));
     let lo = 12*Math.round(((min+max)/2 - size/2)/12);
@@ -494,6 +509,8 @@
   let song = SONGS.ode;
   let handFilter = "B";    // L = left hand only, R = right only, B = both
   let steps = [];          // timeline: [{t, notes:[{m, hand, b, done}]}] sorted by t
+  let sectionSpans = [];   // [{name, startIdx, endIdx}] per section instance (empty if the song has none)
+  let secLoopOn = false;   // "Loop it" — drill the current section on repeat
   let idx = 0;             // current step index
   let curT = 0;            // animated playhead position, in beats
   let hits = 0, misses = 0;
@@ -501,15 +518,34 @@
   // Merge right hand (song.notes) and left hand (song.lh) into one timeline.
   // Entries are [midi, beats]; midi null = rest; a [m,0] entry starts a chord
   // with the following note (zero beats advance no time).
+  // A song is either flat (notes/lh arrays) or sectioned (sections:{A,B,…} + form:[…]).
+  // Flatten a sectioned song into the same notes/lh the engine already expects, and
+  // hand back each section instance's beat span so the timeline can be labelled.
+  function expandSong(s){
+    if(!s.form || !s.sections) return { notes:s.notes, lh:s.lh, spans:[] };
+    const notes = [], lh = [], spans = []; let beat = 0;
+    const lenOf = arr => (arr||[]).reduce((a,e)=>a+e[1], 0);   // [m,0] chord members add 0
+    for(const name of s.form){
+      const sec = s.sections[name];
+      const len = Math.max(lenOf(sec.notes), lenOf(sec.lh));   // sections are whole measures; hands agree
+      spans.push({ name, startBeat:beat, endBeat:beat+len });
+      (sec.notes||[]).forEach(e=>notes.push(e));
+      (sec.lh||[]).forEach(e=>lh.push(e));
+      beat += len;
+    }
+    return { notes, lh, spans };
+  }
+
   function buildSteps(s){
+    const { notes, lh, spans } = expandSong(s);
     const ev = [];
     const walk = (arr, hand) => {
       let t = 0;
       for(const [m,b,o] of (arr||[])){ if(m!=null) ev.push({t, m, hand, b, o}); t += b; }
     };
     // the hand selector filters at the source: Left = lh only, Right = melody only
-    if(handFilter !== "L") walk(s.notes, 0);
-    if(handFilter !== "R") walk(s.lh, 1);
+    if(handFilter !== "L") walk(notes, 0);
+    if(handFilter !== "R") walk(lh, 1);
     const byT = new Map();
     for(const e of ev){
       const k = Math.round(e.t*96);
@@ -521,8 +557,18 @@
       const dur = Math.max(...st.notes.map(n=>n.b));   // for as long as the chord lasts
       for(const n of st.notes) if(!n.b) n.b = dur;
     }
+    // map each section's beat span onto step indices (after the hand filter has run)
+    sectionSpans = spans.map(sp => {
+      let si = 0; while(si < list.length && list[si].t < sp.startBeat - 1e-4) si++;
+      let ei = si; while(ei < list.length && list[ei].t < sp.endBeat - 1e-4) ei++;
+      return { name: sp.name, startIdx: si, endIdx: ei };
+    });
     return list;
   }
+  // which section instance the playhead sits in (null if the song has no sections)
+  function currentSection(){ return sectionSpans.find(sp => idx >= sp.startIdx && idx < sp.endIdx) || null; }
+  // does the song carry a left hand — either flat, or inside any section?
+  function songHasLH(s){ return !!(s.lh || (s.sections && Object.values(s.sections).some(x => x.lh && x.lh.length))); }
 
   const el = id => document.getElementById(id);
   const nextNoteEl = el("nextNote"), progEl = el("progress"), accEl = el("accuracy"), msgEl = el("msg"), hintEl = el("hint");
@@ -613,6 +659,10 @@
       hintEl.textContent = "Free play — tap any keys. Turn on note names if you're still learning where things are.";
       nextNoteEl.textContent = "—"; progEl.textContent = "—"; accEl.textContent = "—";
     }
+    // section bar: only for sectioned songs in learn mode; label follows the playhead
+    const showSec = sectionSpans.length && mode==="learn";
+    el("secBar").hidden = !showSec;
+    if(showSec){ const sec = currentSection(); el("secName").textContent = sec ? sec.name : "—"; }
   }
 
   let msgTimer;
@@ -639,8 +689,11 @@
       if(k){ k.classList.remove("target","targetL"); k.classList.add("good"); setTimeout(()=>k.classList.remove("good"),180); }
       if(step.notes.every(n=>n.done)){
         lastDoneStep = step; lastDoneAt = performance.now();
+        const sec = secLoopOn ? currentSection() : null;   // the section we're completing
         idx++;
-        if(idx>=steps.length) flash("Beautiful — whole song done! ⭐");
+        if(sec && idx >= sec.endIdx){                       // finished the looped section → back to its start
+          idx = sec.startIdx; rearm(sec.startIdx, sec.endIdx); flash("↻ section " + sec.name);
+        } else if(idx>=steps.length) flash("Beautiful — whole song done! ⭐");
       }
       refresh();
     } else {
@@ -800,14 +853,17 @@
   let demoTimer=null, demoReturnIdx=null;
   function stopDemo(){ if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; el("listen").innerHTML="&#9654; Listen";
     if(demoReturnIdx!=null){ idx=demoReturnIdx; demoReturnIdx=null; refresh(); } } }   // put the playhead back where practice was
-  el("listen").addEventListener("click", () => {
-    if(demoTimer){ stopDemo(); return; }
+  // Play steps [from, to) as an audible guided run: audio + the lane, readout and key
+  // glow all follow the playhead. Used by Listen (whole song) and Play-section.
+  function startDemo(from, to){
+    stopDemo();                                       // never stack two demos
     if(ac().state==="suspended") ac().resume();
     el("listen").innerHTML="&#9632; Stop";
-    let i=0; const beat = 60/song.tempo;
+    const beat = 60/song.tempo;
     demoReturnIdx = idx;                              // remember where practice was
+    let i = from;
     const playStep = () => {
-      if(i>=steps.length){ stopDemo(); return; }
+      if(i>=to){ stopDemo(); return; }
       const st = steps[i];
       idx = i;                                        // scroll the falling-notes lane in sync with the audio
       refresh();                                      // keep progress / next-note / current-key glow in step too
@@ -825,19 +881,41 @@
         if(k){ k.classList.add("down"); setTimeout(()=>k.classList.remove("down"), beat*n.b*1000*0.8); }
       }
       i++;
-      const delay = (i<steps.length ? steps[i].t - st.t : (st.notes[0]?.b || 1)) * beat * 1000;
+      const delay = (i<to ? steps[i].t - st.t : (st.notes[0]?.b || 1)) * beat * 1000;
       demoTimer = setTimeout(playStep, delay);
     };
     playStep();
+  }
+  el("listen").addEventListener("click", () => { if(demoTimer) stopDemo(); else startDemo(0, steps.length); });
+
+  // ---------- sections: navigate, drill, hear ----------
+  function rearm(from, to){ for(let i=from;i<to && i<steps.length;i++) for(const n of steps[i].notes) n.done=false; }
+  function seekTo(newIdx){ stopDemo(); idx = Math.max(0, Math.min(newIdx, steps.length)); rearm(idx, steps.length); refresh(); }
+  const secIndex = () => { const s = currentSection(); return s ? sectionSpans.indexOf(s) : -1; };
+  el("secPrev").addEventListener("click", () => {          // start of this section, or the previous one if already there
+    const i = secIndex(); if(i<0) return;
+    seekTo(idx <= sectionSpans[i].startIdx ? (i>0 ? sectionSpans[i-1].startIdx : 0) : sectionSpans[i].startIdx);
+    const s = currentSection(); if(s) flash("Section " + s.name);
+  });
+  el("secNext").addEventListener("click", () => {
+    const i = secIndex(); if(i<0 || i>=sectionSpans.length-1) return;
+    seekTo(sectionSpans[i+1].startIdx);
+    const s = currentSection(); if(s) flash("Section " + s.name);
+  });
+  el("secPlay").addEventListener("click", () => { const s = currentSection(); if(s) startDemo(s.startIdx, s.endIdx); });
+  el("secLoop").addEventListener("change", e => {
+    secLoopOn = e.target.checked;
+    const s = currentSection(); flash(secLoopOn ? (s? "Looping section " + s.name : "Loop on") : "Loop off");
   });
 
   // ---------- controls ----------
   function loadSong(key){
     stopDemo(); song = SONGS[key]; useFlats = !!song.flats;
-    if(!song.lh) handFilter = "B";                    // no left hand to isolate
+    if(!songHasLH(song)) handFilter = "B";            // no separate left hand to isolate
     for(const x of ["L","B","R"]) el("hand-"+x).setAttribute("aria-pressed", x===handFilter);
-    el("handSeg").hidden = !(song.lh && mode==="learn");
+    secLoopOn = false; el("secLoop").checked = false; // don't carry a loop across songs
     steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0;
+    el("handSeg").hidden = !(songHasLH(song) && mode==="learn");
     buildKeyboard(...windowForSong(song)); refresh();
   }
   sel.addEventListener("change", () => loadSong(sel.value));
@@ -872,7 +950,7 @@
     el("mode-free").setAttribute("aria-pressed", m==="free");
     if(m==="learn"){ steps = buildSteps(song); idx=0; curT=0; hits=0; misses=0; buildKeyboard(...windowForSong(song)); }
     else buildKeyboard(48, 72);   // free play: C3..C5, middle C centered
-    el("handSeg").hidden = !(song.lh && m==="learn");
+    el("handSeg").hidden = !(songHasLH(song) && m==="learn");
     refresh();
   }
 
@@ -1045,7 +1123,7 @@
   window.__keysDebug = {
     autoCorrelate, midiName, midiNote,
     sampleRate: () => ac().sampleRate,
-    state: () => ({stepCount: steps.length, idx, handFilter, step: steps[idx]}),
+    state: () => ({stepCount: steps.length, idx, handFilter, step: steps[idx], section: currentSection(), sections: sectionSpans}),
     jump: n => { idx = Math.min(n, steps.length); if(steps[idx]) curT = steps[idx].t; refresh(); }
   };
 
