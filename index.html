@@ -796,16 +796,20 @@
   requestAnimationFrame(() => { resize(); draw(); });
 
   // ---------- listen / demo playback ----------
-  let demoTimer=null;
-  function stopDemo(){ if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; el("listen").innerHTML="&#9654; Listen"; } }
+  let demoTimer=null, demoReturnIdx=null;
+  function stopDemo(){ if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; el("listen").innerHTML="&#9654; Listen";
+    if(demoReturnIdx!=null){ idx=demoReturnIdx; demoReturnIdx=null; refresh(); } } }   // put the playhead back where practice was
   el("listen").addEventListener("click", () => {
     if(demoTimer){ stopDemo(); return; }
     if(ac().state==="suspended") ac().resume();
     el("listen").innerHTML="&#9632; Stop";
     let i=0; const beat = 60/song.tempo;
+    demoReturnIdx = idx;                              // remember where practice was
     const playStep = () => {
       if(i>=steps.length){ stopDemo(); return; }
       const st = steps[i];
+      idx = i;                                        // scroll the falling-notes lane in sync with the audio
+      refresh();                                      // keep progress / next-note / current-key glow in step too
       for(const n of st.notes){
         const vel = n.hand?0.32:0.5;               // LH a touch softer
         if(n.o){
