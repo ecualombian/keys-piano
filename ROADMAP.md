@@ -6,6 +6,21 @@ freely (it's just text — edit, commit, push, or paste thoughts into chat and
 Claude will file them).
 
 ## Now (next working session)
+- [x] **Section model** — SHIPPED 2026-07-19. Songs can declare `sections:{A,B…}` +
+      `form:[…]`; the engine expands the same timeline as before but records each
+      strain's step range. Section bar (Learn mode, sectioned songs only): label
+      follows the playhead, ◀/▶ jump to this/next section start, "Play section" hears
+      one strain, "Loop it" drills it (wrap-on-finish). Delivers the original
+      "back to start of the section" ask + section looping. The Musette is the first
+      sectioned song; flat songs are untouched. Follow-ups:
+  - [ ] Section the Minuet (binary ‖:A:‖‖:B:‖) and the built-in Canon (variations).
+  - [ ] Sectioned **imports**: extend the #import= format + saveImported validation so
+        the personal Canon can carry sections (currently flat). Then its "intro" etc.
+        become navigable/loopable on the device.
+  - [ ] Auto-derive section boundaries from repeat/double barlines during Audiveris
+        conversion, so new songs arrive already sectioned.
+  - Note: this is the foundation the Levels ladder builds on (see Difficulty levels).
+
 - [x] **Back / rewind (fine)** — SHIPPED 2026-07-19. "⏪ Back" button + ← key step the
       playhead back a few notes (3 steps/press) and re-arm them; the lane slides back.
       Manual only, works for any song, no section data needed. Verified: replays clean
@@ -100,7 +115,7 @@ Claude will file them).
 ## Later / ideas
 - [ ] More songs from Alfred's (public-domain pieces only)
 - [ ] Metronome + slow-practice tempo control
-- [ ] Section looping (practice just measures 13–16, repeat)
+- [x] Section looping — SHIPPED 2026-07-19 as part of the section model (below).
 - [ ] Use MIDI note-off (release) data — currently discarded. Not as the step trigger
       (press stays the trigger; release-gating breaks legato), but for: held-duration
       honesty on long notes, sustain visualization, held-chord detection for duet mode.
