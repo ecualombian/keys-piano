@@ -25,14 +25,16 @@ Claude will file them).
       playhead back a few notes (3 steps/press) and re-arm them; the lane slides back.
       Manual only, works for any song, no section data needed. Verified: replays clean
       to the end, guards at the start, no-ops in free play.
-- [ ] **Back to start of section** — the structural jump Carlos asked for ("flub in
-      m7, drop to the top of the strain at m5"). NEEDS the song format to carry section
-      boundaries, which it does not today — repeats are flattened into one list. Plan:
-      author songs as `sections:{A,B...}` + `form:['A','A','B','A','B','A']`; buildSteps
-      records where each section instance begins; the jump becomes a lookup. Same
-      structure unlocks **section looping** and **difficulty levels** (both below).
-      Open design Qs for Carlos: strain-level jump (whole A/B) vs measure-level?
-      Add drag-the-lane-to-scrub as the free-rewind gesture too, or is the button enough?
+- [x] **Back to start of section** — SHIPPED 2026-07-19 by the section model above
+      (the ◀ button in the Section bar). Measure-level Back also shipped separately.
+- [ ] **Slow-practice tempo** — a tempo control (½-speed toggle and/or a slider) that
+      scales playback + the falling-lane speed. The gate already waits indefinitely, so
+      slowing is purely a display/timing scale, not a rule change. Pairs directly with
+      the section loop we just shipped: **loop a hard strain at half speed** is the
+      classic drill. Promoted to Now 2026-07-19 after the ArtMaster/Artie research
+      (see Research below) — Artie makes "loop + slow down" its core practice motion,
+      confirming this is the highest-value next batch. Keep the written tempo as the
+      100% mark; the label should show the real BPM at the chosen speed.
 
 - [x] **Hand selector [L | Both | R]** — SHIPPED 2026-07-17. v1: other hand hidden;
       Listen respects the selection (hear each hand alone). Fast follows still open:
@@ -114,12 +116,42 @@ Claude will file them).
 
 ## Later / ideas
 - [ ] More songs from Alfred's (public-domain pieces only)
-- [ ] Metronome + slow-practice tempo control
+- [ ] Metronome (slow-practice tempo promoted to Now — see above)
 - [x] Section looping — SHIPPED 2026-07-19 as part of the section model (below).
 - [ ] Use MIDI note-off (release) data — currently discarded. Not as the step trigger
       (press stays the trigger; release-gating breaks legato), but for: held-duration
       honesty on long notes, sustain visualization, held-chord detection for duet mode.
 - [ ] Native iPad app (CoreMIDI, App Store) — needs Xcode + Apple Developer decisions
+
+## Research: ArtMaster / Artie (looked at 2026-07-19)
+ArtMaster (artmaster.com) is a subscription music-course platform; its flagship is
+**Artie** (artmaster.com/artie), an AI piano app by MWM (on the App Store). Artie is
+essentially a funded commercial version of what Keys already is — useful mostly as
+validation that the core design is right, plus a couple of ideas worth borrowing.
+
+Where Keys already matches Artie (the hard, defining parts — all done):
+- Listens via **mic or MIDI**; **"Wait Mode"** = waits for the right note (our gate).
+- **Loop tricky parts** (section loop + measure-snap Back); **one/both hands** (L/B/R);
+  **import your own MIDI/MusicXML** (our #import= + the Audiveris→MusicXML pipeline).
+
+Where Artie goes further — transferable ideas, ranked by fit:
+1. **Slow-practice tempo** — Artie's core drill is "loop + slow down". We have loop;
+   tempo is the other half. Promoted to Now (above). Highest-value next batch.
+2. **Three difficulty levels** — Artie has exactly three; validates our L1/L2/L3 plan,
+   now sitting on the section model.
+3. **Rhythm/timing feedback** — a real FORK, not an auto-adopt. Artie judges timing and
+   talks back; our gate deliberately waits forever to stay calm and legato-friendly
+   (decision 2026-07-17). If ever added, make it an *optional* mode, not the default.
+4. **Spoken/AI coaching, adaptive exercises** — SKIP. Against Keys' minimalist,
+   no-account, single-file character; those are Artie's commercial-product features.
+
+Framing: Keys should NOT try to compete with a subscription app. Its distinct value
+is being Carlos's own free instrument with *his* exact book transcriptions, octaves,
+fingerings, and local (even copyrighted) originals — which no commercial app gives.
+The research sharpens the roadmap (slow-tempo next, Levels validated); it does not
+redirect the project. Minor tech note: Artie imports MIDI/MusicXML directly; we
+convert to our leaner format via Audiveris — direct in-browser import is possible
+later but not worth rushing.
 
 ## Decisions on record
 - Ornaments: shown as `~`, main note satisfies the gate; full ornament playing is
